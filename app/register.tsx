@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -10,124 +10,251 @@ import {
   ScrollView,
   Image,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Input } from '../components/Input';
-import { Button } from '../components/Button';
-import { theme } from '../config/theme';
-import { useAuth } from '../contexts/AuthContext';
-import { Header } from '../components/Header';
+  TextInput,
+  ActivityIndicator,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
+import { Input } from "../components/Input";
+import { Button } from "../components/Button";
+import { theme } from "../config/theme";
+import { useAuth } from "../contexts/AuthContext";
+import { Header } from "../components/Header";
+import { EnhancedServiceIcon } from "../components/EnhancedServiceIcon";
+import { useProfessional } from "../contexts/ProfessionalContext";
+import { professionalAPI } from "../services/api";
 
 // Datos para el formulario de profesionales
 const categories = [
-  { id: 'plomeria', name: 'Plomería', icon: 'water', color: '#3b82f6' },
-  { id: 'gas', name: 'Gas', icon: 'flame', color: '#f97316' },
-  { id: 'electricidad', name: 'Electricidad', icon: 'flash', color: '#f59e0b' },
-  { id: 'albanileria', name: 'Albañilería', icon: 'construct', color: '#ef4444' },
-  { id: 'carpinteria', name: 'Carpintería', icon: 'hammer', color: '#8b4513' },
-  { id: 'herreria', name: 'Herrería', icon: 'hardware-chip', color: '#64748b' },
-  { id: 'limpieza', name: 'Limpieza', icon: 'sparkles', color: '#8b5cf6' },
-  { id: 'mecanica', name: 'Mecánica', icon: 'car', color: '#1e293b' },
-  { id: 'aire_acondicionado', name: 'Aire Acondicionado', icon: 'thermometer', color: '#0ea5e9' },
-  { id: 'tecnico_comp_redes', name: 'Técnico en Comp y Redes', icon: 'laptop', color: '#6366f1' },
-  { id: 'cerrajeria', name: 'Cerrajería', icon: 'key', color: '#7c3aed' },
+  { id: "plomeria", name: "Plomería", icon: "water", color: "#3b82f6" },
+  { id: "gas", name: "Gas", icon: "flame", color: "#f97316" },
+  { id: "electricidad", name: "Electricidad", icon: "flash", color: "#f59e0b" },
+  {
+    id: "albanileria",
+    name: "Albañilería",
+    icon: "construct",
+    color: "#ef4444",
+  },
+  { id: "carpinteria", name: "Carpintería", icon: "hammer", color: "#8b4513" },
+  { id: "herreria", name: "Herrería", icon: "hardware-chip", color: "#64748b" },
+  { id: "limpieza", name: "Limpieza", icon: "sparkles", color: "#8b5cf6" },
+  { id: "mecanica", name: "Mecánica", icon: "car", color: "#1e293b" },
+  {
+    id: "aire_acondicionado",
+    name: "Aire Acondicionado",
+    icon: "thermometer",
+    color: "#0ea5e9",
+  },
+  {
+    id: "tecnico_comp_redes",
+    name: "Técnico en Comp y Redes",
+    icon: "laptop",
+    color: "#6366f1",
+  },
+  { id: "cerrajeria", name: "Cerrajería", icon: "key", color: "#7c3aed" },
 ];
 
 const experienceLevels = [
-  { id: 'beginner', name: 'Principiante (0-2 años)' },
-  { id: 'intermediate', name: 'Intermedio (2-5 años)' },
-  { id: 'advanced', name: 'Avanzado (5+ años)' },
+  { id: "beginner", name: "Principiante (0-2 años)" },
+  { id: "intermediate", name: "Intermedio (2-5 años)" },
+  { id: "advanced", name: "Avanzado (5+ años)" },
 ];
 
 export default function RegisterScreen({ navigation }: any) {
   const { register, loading } = useAuth();
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
-    userType: 'client', // 'client' or 'professional'
-    // Campos adicionales para profesionales
-    specialty: '',
-    experience: '',
-    description: '',
-    location: '',
-    availability: '',
-    responseTime: '',
+  const { setRegistrationComplete, loadProfessionalData } = useProfessional();
+
+  // Estado para controlar si se ha seleccionado el rol
+  const [roleSelected, setRoleSelected] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<
+    "client" | "professional" | null
+  >(null);
+
+  // Estados para el formulario de cliente
+  const [clientFormData, setClientFormData] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  // Estados para el formulario de profesional
+  const [professionalFormData, setProfessionalFormData] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    specialty: "",
+    experience: "",
+    description: "",
+    location: "",
+    availability: "",
+    responseTime: "",
     services: [] as string[],
-    priceRange: '',
+    priceRange: "",
     certifications: [] as string[],
     languages: [] as string[],
   });
+
+  // Estados para imágenes de profesional
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [dniFrontImage, setDniFrontImage] = useState<string | null>(null);
+  const [dniBackImage, setDniBackImage] = useState<string | null>(null);
+
+  // Estados para campos dinámicos de profesional
+  const [serviceText, setServiceText] = useState("");
+  const [certificationText, setCertificationText] = useState("");
+  const [languageText, setLanguageText] = useState("");
+
+  // Estados para el formulario de profesional por pasos
+  const [currentStep, setCurrentStep] = useState(1);
+  const [professionalLoading, setProfessionalLoading] = useState(false);
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
-  // Estados para campos dinámicos de profesionales
-  const [serviceText, setServiceText] = useState('');
-  const [certificationText, setCertificationText] = useState('');
-  const [languageText, setLanguageText] = useState('');
 
-  const updateFormData = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
+  const updateClientFormData = (field: string, value: string) => {
+    setClientFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
+      setErrors((prev) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const updateProfessionalFormData = (field: string, value: any) => {
+    setProfessionalFormData((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
   // Funciones para campos dinámicos de profesionales
   const handleAddService = () => {
     if (serviceText.trim()) {
-      setFormData(prev => ({
+      setProfessionalFormData((prev) => ({
         ...prev,
-        services: [...prev.services, serviceText.trim()]
+        services: [...prev.services, serviceText.trim()],
       }));
-      setServiceText('');
+      setServiceText("");
     }
   };
 
   const handleAddCertification = () => {
     if (certificationText.trim()) {
-      setFormData(prev => ({
+      setProfessionalFormData((prev) => ({
         ...prev,
-        certifications: [...prev.certifications, certificationText.trim()]
+        certifications: [...prev.certifications, certificationText.trim()],
       }));
-      setCertificationText('');
+      setCertificationText("");
     }
   };
 
   const handleAddLanguage = () => {
     if (languageText.trim()) {
-      setFormData(prev => ({
+      setProfessionalFormData((prev) => ({
         ...prev,
-        languages: [...prev.languages, languageText.trim()]
+        languages: [...prev.languages, languageText.trim()],
       }));
-      setLanguageText('');
+      setLanguageText("");
     }
   };
 
   const handleRemoveService = (index: number) => {
-    setFormData(prev => ({
+    setProfessionalFormData((prev) => ({
       ...prev,
-      services: prev.services.filter((_, i) => i !== index)
+      services: prev.services.filter((_, i) => i !== index),
     }));
   };
 
   const handleRemoveCertification = (index: number) => {
-    setFormData(prev => ({
+    setProfessionalFormData((prev) => ({
       ...prev,
-      certifications: prev.certifications.filter((_, i) => i !== index)
+      certifications: prev.certifications.filter((_, i) => i !== index),
     }));
   };
 
   const handleRemoveLanguage = (index: number) => {
-    setFormData(prev => ({
+    setProfessionalFormData((prev) => ({
       ...prev,
-      languages: prev.languages.filter((_, i) => i !== index)
+      languages: prev.languages.filter((_, i) => i !== index),
     }));
+  };
+
+  // Funciones para manejar imágenes
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permisos Requeridos",
+        "Necesitamos acceso a tu galería para seleccionar fotos.",
+        [{ text: "OK" }]
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const selectImage = async (type: "profile" | "dni_front" | "dni_back") => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: type === "profile" ? [1, 1] : [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        if (type === "profile") {
+          setProfileImage(result.assets[0].uri);
+        } else if (type === "dni_front") {
+          setDniFrontImage(result.assets[0].uri);
+        } else if (type === "dni_back") {
+          setDniBackImage(result.assets[0].uri);
+        }
+      }
+    } catch (error) {
+      console.error("Error selecting image:", error);
+      Alert.alert("Error", "No se pudo seleccionar la imagen");
+    }
+  };
+
+  const takePhoto = async (type: "profile" | "dni_front" | "dni_back") => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permisos Requeridos",
+        "Necesitamos acceso a tu cámara para tomar fotos.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: type === "profile" ? [1, 1] : [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        if (type === "profile") {
+          setProfileImage(result.assets[0].uri);
+        } else if (type === "dni_front") {
+          setDniFrontImage(result.assets[0].uri);
+        } else if (type === "dni_back") {
+          setDniBackImage(result.assets[0].uri);
+        }
+      }
+    } catch (error) {
+      console.error("Error taking photo:", error);
+      Alert.alert("Error", "No se pudo tomar la foto");
+    }
   };
 
   const validateEmail = (email: string) => {
@@ -140,90 +267,368 @@ export default function RegisterScreen({ navigation }: any) {
     return phoneRegex.test(phone);
   };
 
-  const handleRegister = async () => {
+  const validateClientForm = () => {
     const newErrors: Record<string, string> = {};
 
-    // Validation
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'El nombre completo es requerido';
+    if (!clientFormData.fullName.trim()) {
+      newErrors.fullName = "El nombre completo es requerido";
     }
 
-    if (!formData.email) {
-      newErrors.email = 'El email es requerido';
-    } else if (!validateEmail(formData.email)) {
-      newErrors.email = 'Email inválido';
+    if (!clientFormData.email) {
+      newErrors.email = "El email es requerido";
+    } else if (!validateEmail(clientFormData.email)) {
+      newErrors.email = "Email inválido";
     }
 
-    if (!formData.phone) {
-      newErrors.phone = 'El teléfono es requerido';
-    } else if (!validatePhone(formData.phone)) {
-      newErrors.phone = 'Teléfono inválido';
+    if (!clientFormData.phone) {
+      newErrors.phone = "El teléfono es requerido";
+    } else if (!validatePhone(clientFormData.phone)) {
+      newErrors.phone = "Teléfono inválido";
     }
 
-    if (!formData.password) {
-      newErrors.password = 'La contraseña es requerida';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'La contraseña debe tener al menos 6 caracteres';
+    if (!clientFormData.password) {
+      newErrors.password = "La contraseña es requerida";
+    } else if (clientFormData.password.length < 6) {
+      newErrors.password = "La contraseña debe tener al menos 6 caracteres";
     }
 
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Confirma tu contraseña';
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Las contraseñas no coinciden';
+    if (!clientFormData.confirmPassword) {
+      newErrors.confirmPassword = "Confirma tu contraseña";
+    } else if (clientFormData.password !== clientFormData.confirmPassword) {
+      newErrors.confirmPassword = "Las contraseñas no coinciden";
     }
 
-    // Solo validar para clientes
-    if (formData.userType !== 'client') {
-      newErrors.userType = 'Selecciona el tipo de usuario';
-    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
+  const validateProfessionalStep = (step: number) => {
+    const newErrors: Record<string, string> = {};
 
-    try {
-      const result = await register(formData);
-      
-      if (result.success) {
-        Alert.alert('Éxito', result.message, [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('Login')
-          }
-        ]);
-      } else {
-        Alert.alert('Error', result.message);
+    if (step === 1) {
+      if (!professionalFormData.fullName.trim())
+        newErrors.fullName = "El nombre completo es requerido";
+      if (!professionalFormData.phone.trim())
+        newErrors.phone = "El teléfono es requerido";
+      if (!professionalFormData.email.trim())
+        newErrors.email = "El email es requerido";
+      if (!professionalFormData.password)
+        newErrors.password = "La contraseña es requerida";
+      if (!professionalFormData.confirmPassword)
+        newErrors.confirmPassword = "Confirma tu contraseña";
+      if (
+        professionalFormData.password !== professionalFormData.confirmPassword
+      ) {
+        newErrors.confirmPassword = "Las contraseñas no coinciden";
       }
-    } catch (error) {
-      Alert.alert('Error', 'Error al conectar con el servidor');
+      if (!profileImage)
+        newErrors.profileImage = "La foto de perfil es requerida";
+    }
+
+    if (step === 2) {
+      if (!professionalFormData.specialty)
+        newErrors.specialty = "Selecciona una especialidad";
+      if (!professionalFormData.experience)
+        newErrors.experience = "Selecciona tu nivel de experiencia";
+      if (!professionalFormData.description.trim())
+        newErrors.description = "La descripción es requerida";
+      if (!professionalFormData.location.trim())
+        newErrors.location = "La ubicación es requerida";
+      if (!dniFrontImage)
+        newErrors.dniFrontImage = "La foto frontal del DNI es requerida";
+      if (!dniBackImage)
+        newErrors.dniBackImage = "La foto trasera del DNI es requerida";
+    }
+
+    if (step === 3) {
+      if (professionalFormData.services.length === 0)
+        newErrors.services = "Agrega al menos un servicio";
+      if (!professionalFormData.priceRange.trim())
+        newErrors.priceRange = "El rango de precios es requerido";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleClientRegister = async () => {
+    if (validateClientForm()) {
+      try {
+        const result = await register({
+          ...clientFormData,
+          userType: "client",
+        });
+
+        if (result.success) {
+          Alert.alert("Éxito", result.message, [
+            {
+              text: "OK",
+              onPress: () => navigation.navigate("Login"),
+            },
+          ]);
+        } else {
+          Alert.alert("Error", result.message);
+        }
+      } catch (error) {
+        Alert.alert("Error", "Error al conectar con el servidor");
+      }
     }
   };
 
-  return (
+  const handleProfessionalNext = () => {
+    if (validateProfessionalStep(currentStep)) {
+      if (currentStep < 3) {
+        setCurrentStep(currentStep + 1);
+      } else {
+        handleProfessionalSubmit();
+      }
+    }
+  };
+
+  const handleProfessionalBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleProfessionalSubmit = async () => {
+    if (validateProfessionalStep(currentStep)) {
+      setProfessionalLoading(true);
+      try {
+        // Primero registrar el usuario
+        const registerResult = await register({
+          fullName: professionalFormData.fullName,
+          email: professionalFormData.email,
+          phone: professionalFormData.phone,
+          password: professionalFormData.password,
+          confirmPassword: professionalFormData.confirmPassword,
+          userType: "professional",
+        });
+
+        if (registerResult.success) {
+          // Luego completar el registro profesional
+          const response = await professionalAPI.completeRegistration(
+            {
+              fullName: professionalFormData.fullName,
+              phone: professionalFormData.phone,
+              email: professionalFormData.email,
+              profileImage: profileImage,
+              dniFrontImage: dniFrontImage,
+              dniBackImage: dniBackImage,
+              specialty: professionalFormData.specialty,
+              experience: professionalFormData.experience,
+              description: professionalFormData.description,
+              location: professionalFormData.location,
+              availability: professionalFormData.availability,
+              responseTime: professionalFormData.responseTime,
+              services: professionalFormData.services,
+              priceRange: professionalFormData.priceRange,
+              certifications: professionalFormData.certifications,
+              languages: professionalFormData.languages,
+            },
+            registerResult.userId
+          );
+
+          if (response.success) {
+            await loadProfessionalData();
+
+            Alert.alert(
+              "Registro Exitoso",
+              "Tu perfil profesional ha sido creado exitosamente. Los clientes podrán encontrarte y contactarte.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => navigation.navigate("Login"),
+                },
+              ]
+            );
+          } else {
+            Alert.alert(
+              "Error",
+              response.error || "Error al completar el registro profesional"
+            );
+          }
+        } else {
+          Alert.alert("Error", registerResult.message);
+        }
+      } catch (error) {
+        Alert.alert("Error", "Error de conexión al completar el registro");
+      } finally {
+        setProfessionalLoading(false);
+      }
+    }
+  };
+
+  const handleRoleSelection = (role: "client" | "professional") => {
+    setSelectedRole(role);
+    setRoleSelected(true);
+    setCurrentStep(1);
+    setErrors({});
+  };
+
+  const handleBackToRoleSelection = () => {
+    setRoleSelected(false);
+    setSelectedRole(null);
+    setCurrentStep(1);
+    setErrors({});
+    // Limpiar formularios
+    setClientFormData({
+      fullName: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+    });
+    setProfessionalFormData({
+      fullName: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+      specialty: "",
+      experience: "",
+      description: "",
+      location: "",
+      availability: "",
+      responseTime: "",
+      services: [],
+      priceRange: "",
+      certifications: [],
+      languages: [],
+    });
+    setProfileImage(null);
+    setDniFrontImage(null);
+    setDniBackImage(null);
+  };
+
+  // Renderizar selección de rol
+  const renderRoleSelection = () => (
     <View style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header con gradiente */}
           <LinearGradient
             colors={[theme.colors.primary, theme.colors.secondary]}
             style={styles.header}
           >
- 
             <View style={styles.logoContainer}>
               <View style={styles.logoCircle}>
-                <Image 
-                  source={require('../assets/icon.png')} 
+                <Image
+                  source={require("../assets/icon.png")}
                   style={styles.logoImage}
                   resizeMode="contain"
                 />
               </View>
             </View>
             <Text style={styles.title}>¡Registrate!</Text>
-            <Text style={styles.subtitle}>Crea tu cuenta en Professional Service</Text>
+            <Text style={styles.subtitle}>
+              Crea tu cuenta en Professional Service
+            </Text>
+          </LinearGradient>
+
+          {/* Selección de rol */}
+          <View style={styles.formContainer}>
+            <Text style={styles.roleSelectionTitle}>
+              ¿Qué tipo de cuenta quieres crear?
+            </Text>
+            <Text style={styles.roleSelectionSubtitle}>
+              Selecciona el rol que mejor te describa
+            </Text>
+
+            <View style={styles.roleButtonsContainer}>
+              <TouchableOpacity
+                style={styles.roleButton}
+                onPress={() => handleRoleSelection("client")}
+              >
+                <View style={styles.roleIconContainer}>
+                  <Ionicons
+                    name="person"
+                    size={40}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <Text style={styles.roleTitle}>Cliente</Text>
+                <Text style={styles.roleDescription}>
+                  Busco servicios profesionales para mis necesidades
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.roleButton}
+                onPress={() => handleRoleSelection("professional")}
+              >
+                <View style={styles.roleIconContainer}>
+                  <Ionicons
+                    name="briefcase"
+                    size={40}
+                    color={theme.colors.primary}
+                  />
+                </View>
+                <Text style={styles.roleTitle}>Profesional</Text>
+                <Text style={styles.roleDescription}>
+                  Ofrezco servicios profesionales a clientes
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Login Link */}
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+                <Text style={styles.loginLink}>Inicia sesión aquí</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
+  );
+
+  // Renderizar formulario de cliente
+  const renderClientForm = () => (
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header con gradiente */}
+          <LinearGradient
+            colors={[theme.colors.primary, theme.colors.secondary]}
+            style={styles.header}
+          >
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBackToRoleSelection}
+            >
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={theme.colors.white}
+              />
+            </TouchableOpacity>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoCircle}>
+                <Image
+                  source={require("../assets/icon.png")}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+            <Text style={styles.title}>Registro de Cliente</Text>
+            <Text style={styles.subtitle}>
+              Crea tu cuenta para solicitar servicios
+            </Text>
           </LinearGradient>
 
           {/* Form */}
@@ -231,16 +636,16 @@ export default function RegisterScreen({ navigation }: any) {
             <Input
               label="Nombre Completo"
               placeholder="Tu nombre completo"
-              value={formData.fullName}
-              onChangeText={(value) => updateFormData('fullName', value)}
+              value={clientFormData.fullName}
+              onChangeText={(value) => updateClientFormData("fullName", value)}
               error={errors.fullName}
             />
 
             <Input
               label="Email"
               placeholder="tu@email.com"
-              value={formData.email}
-              onChangeText={(value) => updateFormData('email', value)}
+              value={clientFormData.email}
+              onChangeText={(value) => updateClientFormData("email", value)}
               keyboardType="email-address"
               autoCapitalize="none"
               error={errors.email}
@@ -249,8 +654,8 @@ export default function RegisterScreen({ navigation }: any) {
             <Input
               label="Teléfono"
               placeholder="+1 234 567 8900"
-              value={formData.phone}
-              onChangeText={(value) => updateFormData('phone', value)}
+              value={clientFormData.phone}
+              onChangeText={(value) => updateClientFormData("phone", value)}
               keyboardType="phone-pad"
               error={errors.phone}
             />
@@ -259,8 +664,10 @@ export default function RegisterScreen({ navigation }: any) {
               <Input
                 label="Contraseña"
                 placeholder="Tu contraseña"
-                value={formData.password}
-                onChangeText={(value) => updateFormData('password', value)}
+                value={clientFormData.password}
+                onChangeText={(value) =>
+                  updateClientFormData("password", value)
+                }
                 secureTextEntry={!showPassword}
                 error={errors.password}
               />
@@ -269,7 +676,7 @@ export default function RegisterScreen({ navigation }: any) {
                 onPress={() => setShowPassword(!showPassword)}
               >
                 <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
+                  name={showPassword ? "eye-off" : "eye"}
                   size={20}
                   color={theme.colors.textSecondary}
                 />
@@ -280,8 +687,10 @@ export default function RegisterScreen({ navigation }: any) {
               <Input
                 label="Confirmar Contraseña"
                 placeholder="Confirma tu contraseña"
-                value={formData.confirmPassword}
-                onChangeText={(value) => updateFormData('confirmPassword', value)}
+                value={clientFormData.confirmPassword}
+                onChangeText={(value) =>
+                  updateClientFormData("confirmPassword", value)
+                }
                 secureTextEntry={!showConfirmPassword}
                 error={errors.confirmPassword}
               />
@@ -290,78 +699,23 @@ export default function RegisterScreen({ navigation }: any) {
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               >
                 <Ionicons
-                  name={showConfirmPassword ? 'eye-off' : 'eye'}
+                  name={showConfirmPassword ? "eye-off" : "eye"}
                   size={20}
                   color={theme.colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
 
-            {/* User Type Selection */}
-            <View style={styles.userTypeContainer}>
-              <Text style={styles.userTypeLabel}>Tipo de Usuario</Text>
-              <View style={styles.userTypeButtons}>
-                <TouchableOpacity
-                  style={[
-                    styles.userTypeButton,
-                    formData.userType === 'client' && styles.userTypeButtonActive,
-                  ]}
-                  onPress={() => updateFormData('userType', 'client')}
-                >
-                  <Ionicons
-                    name="person"
-                    size={20}
-                    color={formData.userType === 'client' ? theme.colors.white : theme.colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.userTypeText,
-                      formData.userType === 'client' && styles.userTypeTextActive,
-                    ]}
-                  >
-                    Cliente
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.userTypeButton,
-                    formData.userType === 'professional' && styles.userTypeButtonActive,
-                  ]}
-                  onPress={() => {
-                    updateFormData('userType', 'professional');
-                    // Navegar al registro de profesional en pasos
-                    navigation.navigate('ProfessionalRegisterSteps');
-                  }}
-                >
-                  <Ionicons
-                    name="briefcase"
-                    size={20}
-                    color={formData.userType === 'professional' ? theme.colors.white : theme.colors.primary}
-                  />
-                  <Text
-                    style={[
-                      styles.userTypeText,
-                      formData.userType === 'professional' && styles.userTypeTextActive,
-                    ]}
-                  >
-                    Profesional
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            <View style={styles.clientInfo}>
+              <Text style={styles.infoText}>
+                Como cliente podrás solicitar servicios de profesionales
+                certificados y recibir cotizaciones personalizadas.
+              </Text>
             </View>
 
-            {/* Información adicional para clientes */}
-            {formData.userType === 'client' && (
-              <View style={styles.clientInfo}>
-                <Text style={styles.infoText}>
-                  Como cliente podrás solicitar servicios de profesionales certificados y recibir cotizaciones personalizadas.
-                </Text>
-              </View>
-            )}
-
             <Button
-              title={loading ? "Creando..." : "Crear Cuenta"}
-              onPress={handleRegister}
+              title={loading ? "Creando..." : "Crear Cuenta de Cliente"}
+              onPress={handleClientRegister}
               style={styles.registerButton}
               disabled={loading}
             />
@@ -369,7 +723,7 @@ export default function RegisterScreen({ navigation }: any) {
             {/* Login Link */}
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>¿Ya tienes cuenta? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <TouchableOpacity onPress={() => navigation.navigate("Login")}>
                 <Text style={styles.loginLink}>Inicia sesión aquí</Text>
               </TouchableOpacity>
             </View>
@@ -378,36 +732,589 @@ export default function RegisterScreen({ navigation }: any) {
       </KeyboardAvoidingView>
     </View>
   );
+
+  // Renderizar pasos del formulario de profesional
+  const renderProfessionalStep1 = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <Ionicons name="person-circle" size={40} color={theme.colors.primary} />
+        <Text style={styles.stepTitle}>Información Personal</Text>
+        <Text style={styles.stepSubtitle}>
+          Comencemos con tus datos básicos
+        </Text>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Foto de Perfil</Text>
+        {errors.profileImage && (
+          <Text style={styles.errorText}>{errors.profileImage}</Text>
+        )}
+
+        {profileImage ? (
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={() => setProfileImage(null)}
+            >
+              <Ionicons
+                name="close-circle"
+                size={24}
+                color={theme.colors.error}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.imageSelectorContainer}>
+            <TouchableOpacity
+              style={styles.imageSelector}
+              onPress={() => takePhoto("profile")}
+            >
+              <Ionicons name="camera" size={32} color={theme.colors.primary} />
+              <Text style={styles.imageSelectorText}>Tomar Foto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.imageSelector}
+              onPress={() => selectImage("profile")}
+            >
+              <Ionicons name="images" size={32} color={theme.colors.primary} />
+              <Text style={styles.imageSelectorText}>Galería</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <Input
+        label="Nombre Completo"
+        placeholder="Tu nombre completo"
+        value={professionalFormData.fullName}
+        onChangeText={(value) => updateProfessionalFormData("fullName", value)}
+        error={errors.fullName}
+      />
+
+      <Input
+        label="Email"
+        placeholder="tu@email.com"
+        value={professionalFormData.email}
+        onChangeText={(value) => updateProfessionalFormData("email", value)}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        error={errors.email}
+      />
+
+      <Input
+        label="Teléfono"
+        placeholder="+1 234 567 8900"
+        value={professionalFormData.phone}
+        onChangeText={(value) => updateProfessionalFormData("phone", value)}
+        keyboardType="phone-pad"
+        error={errors.phone}
+      />
+
+      <View style={styles.passwordContainer}>
+        <Input
+          label="Contraseña"
+          placeholder="Tu contraseña"
+          value={professionalFormData.password}
+          onChangeText={(value) =>
+            updateProfessionalFormData("password", value)
+          }
+          secureTextEntry={!showPassword}
+          error={errors.password}
+        />
+        <TouchableOpacity
+          style={styles.eyeButton}
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Ionicons
+            name={showPassword ? "eye-off" : "eye"}
+            size={20}
+            color={theme.colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.passwordContainer}>
+        <Input
+          label="Confirmar Contraseña"
+          placeholder="Confirma tu contraseña"
+          value={professionalFormData.confirmPassword}
+          onChangeText={(value) =>
+            updateProfessionalFormData("confirmPassword", value)
+          }
+          secureTextEntry={!showConfirmPassword}
+          error={errors.confirmPassword}
+        />
+        <TouchableOpacity
+          style={styles.eyeButton}
+          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+        >
+          <Ionicons
+            name={showConfirmPassword ? "eye-off" : "eye"}
+            size={20}
+            color={theme.colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderProfessionalStep2 = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <Ionicons name="briefcase" size={40} color={theme.colors.primary} />
+        <Text style={styles.stepTitle}>Información Profesional</Text>
+        <Text style={styles.stepSubtitle}>Cuéntanos sobre tu experiencia</Text>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Foto del DNI - Lado Frontal</Text>
+        <Text style={styles.inputSubtext}>
+          Necesitamos verificar tu identidad
+        </Text>
+        {errors.dniFrontImage && (
+          <Text style={styles.errorText}>{errors.dniFrontImage}</Text>
+        )}
+
+        {dniFrontImage ? (
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: dniFrontImage }} style={styles.dniImage} />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={() => setDniFrontImage(null)}
+            >
+              <Ionicons
+                name="close-circle"
+                size={24}
+                color={theme.colors.error}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.imageSelectorContainer}>
+            <TouchableOpacity
+              style={styles.imageSelector}
+              onPress={() => takePhoto("dni_front")}
+            >
+              <Ionicons name="camera" size={32} color={theme.colors.primary} />
+              <Text style={styles.imageSelectorText}>Tomar Foto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.imageSelector}
+              onPress={() => selectImage("dni_front")}
+            >
+              <Ionicons name="images" size={32} color={theme.colors.primary} />
+              <Text style={styles.imageSelectorText}>Galería</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Foto del DNI - Lado Trasero</Text>
+        <Text style={styles.inputSubtext}>
+          Necesitamos verificar tu identidad
+        </Text>
+        {errors.dniBackImage && (
+          <Text style={styles.errorText}>{errors.dniBackImage}</Text>
+        )}
+
+        {dniBackImage ? (
+          <View style={styles.imageContainer}>
+            <Image source={{ uri: dniBackImage }} style={styles.dniImage} />
+            <TouchableOpacity
+              style={styles.removeImageButton}
+              onPress={() => setDniBackImage(null)}
+            >
+              <Ionicons
+                name="close-circle"
+                size={24}
+                color={theme.colors.error}
+              />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.imageSelectorContainer}>
+            <TouchableOpacity
+              style={styles.imageSelector}
+              onPress={() => takePhoto("dni_back")}
+            >
+              <Ionicons name="camera" size={32} color={theme.colors.primary} />
+              <Text style={styles.imageSelectorText}>Tomar Foto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.imageSelector}
+              onPress={() => selectImage("dni_back")}
+            >
+              <Ionicons name="images" size={32} color={theme.colors.primary} />
+              <Text style={styles.imageSelectorText}>Galería</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Especialidad</Text>
+        <View style={styles.categoriesGrid}>
+          {categories.map((category) => (
+            <TouchableOpacity
+              key={category.id}
+              style={[
+                styles.categoryCard,
+                professionalFormData.specialty === category.id &&
+                  styles.categoryCardActive,
+              ]}
+              onPress={() =>
+                updateProfessionalFormData("specialty", category.id)
+              }
+            >
+              <EnhancedServiceIcon type={category.id} size={50} />
+              <Text style={styles.categoryName}>{category.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {errors.specialty && (
+          <Text style={styles.errorText}>{errors.specialty}</Text>
+        )}
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Nivel de Experiencia</Text>
+        {experienceLevels.map((level) => (
+          <TouchableOpacity
+            key={level.id}
+            style={[
+              styles.experienceCard,
+              professionalFormData.experience === level.id &&
+                styles.experienceCardActive,
+            ]}
+            onPress={() => updateProfessionalFormData("experience", level.id)}
+          >
+            <Text
+              style={[
+                styles.experienceText,
+                professionalFormData.experience === level.id &&
+                  styles.experienceTextActive,
+              ]}
+            >
+              {level.name}
+            </Text>
+          </TouchableOpacity>
+        ))}
+        {errors.experience && (
+          <Text style={styles.errorText}>{errors.experience}</Text>
+        )}
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Descripción Profesional</Text>
+        <TextInput
+          style={[styles.textArea, errors.description && styles.inputError]}
+          placeholder="Describe tu experiencia, especialidades y lo que te hace único como profesional..."
+          value={professionalFormData.description}
+          onChangeText={(value) =>
+            updateProfessionalFormData("description", value)
+          }
+          multiline
+          numberOfLines={4}
+        />
+        {errors.description && (
+          <Text style={styles.errorText}>{errors.description}</Text>
+        )}
+      </View>
+
+      <Input
+        label="Ubicación de Trabajo"
+        placeholder="Ej: San José, Costa Rica"
+        value={professionalFormData.location}
+        onChangeText={(value) => updateProfessionalFormData("location", value)}
+        error={errors.location}
+      />
+
+      <Input
+        label="Horarios de Disponibilidad"
+        placeholder="Ej: Lun-Vie 8:00 AM - 6:00 PM"
+        value={professionalFormData.availability}
+        onChangeText={(value) =>
+          updateProfessionalFormData("availability", value)
+        }
+      />
+
+      <Input
+        label="Tiempo de Respuesta"
+        placeholder="Ej: 2-4 horas"
+        value={professionalFormData.responseTime}
+        onChangeText={(value) =>
+          updateProfessionalFormData("responseTime", value)
+        }
+      />
+    </View>
+  );
+
+  const renderProfessionalStep3 = () => (
+    <View style={styles.stepContainer}>
+      <View style={styles.stepHeader}>
+        <Ionicons name="cash" size={40} color={theme.colors.primary} />
+        <Text style={styles.stepTitle}>Servicios y Precios</Text>
+        <Text style={styles.stepSubtitle}>
+          Define qué ofreces y a qué precio
+        </Text>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Servicios que Ofreces</Text>
+        <View style={styles.addItemContainer}>
+          <TextInput
+            style={styles.addItemInput}
+            placeholder="Ej: Reparación de tuberías"
+            value={serviceText}
+            onChangeText={setServiceText}
+            onSubmitEditing={handleAddService}
+          />
+          <TouchableOpacity style={styles.addButton} onPress={handleAddService}>
+            <Ionicons name="add" size={20} color={theme.colors.white} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.itemsList}>
+          {professionalFormData.services.map((service, index) => (
+            <View key={index} style={styles.itemCard}>
+              <Text style={styles.itemText}>{service}</Text>
+              <TouchableOpacity onPress={() => handleRemoveService(index)}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={theme.colors.error}
+                />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+        {errors.services && (
+          <Text style={styles.errorText}>{errors.services}</Text>
+        )}
+      </View>
+
+      <Input
+        label="Rango de Precios"
+        placeholder="Ej: $50 - $150 por trabajo"
+        value={professionalFormData.priceRange}
+        onChangeText={(value) =>
+          updateProfessionalFormData("priceRange", value)
+        }
+        error={errors.priceRange}
+      />
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Certificaciones</Text>
+        <View style={styles.addItemContainer}>
+          <TextInput
+            style={styles.addItemInput}
+            placeholder="Ej: Técnico en Plomería"
+            value={certificationText}
+            onChangeText={setCertificationText}
+            onSubmitEditing={handleAddCertification}
+          />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddCertification}
+          >
+            <Ionicons name="add" size={20} color={theme.colors.white} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.itemsList}>
+          {professionalFormData.certifications.map((certification, index) => (
+            <View key={index} style={styles.itemCard}>
+              <Text style={styles.itemText}>{certification}</Text>
+              <TouchableOpacity
+                onPress={() => handleRemoveCertification(index)}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={theme.colors.error}
+                />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Idiomas que Hablas</Text>
+        <View style={styles.addItemContainer}>
+          <TextInput
+            style={styles.addItemInput}
+            placeholder="Ej: Español"
+            value={languageText}
+            onChangeText={setLanguageText}
+            onSubmitEditing={handleAddLanguage}
+          />
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddLanguage}
+          >
+            <Ionicons name="add" size={20} color={theme.colors.white} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.itemsList}>
+          {professionalFormData.languages.map((language, index) => (
+            <View key={index} style={styles.itemCard}>
+              <Text style={styles.itemText}>{language}</Text>
+              <TouchableOpacity onPress={() => handleRemoveLanguage(index)}>
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={theme.colors.error}
+                />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+
+  // Renderizar formulario de profesional
+  const renderProfessionalForm = () => (
+    <View style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardView}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header con gradiente */}
+          <LinearGradient
+            colors={[theme.colors.primary, theme.colors.secondary]}
+            style={styles.header}
+          >
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={handleBackToRoleSelection}
+            >
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={theme.colors.white}
+              />
+            </TouchableOpacity>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoCircle}>
+                <Image
+                  source={require("../assets/icon.png")}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </View>
+            </View>
+            <Text style={styles.title}>Registro de Profesional</Text>
+            <Text style={styles.subtitle}>Paso {currentStep} de 3</Text>
+          </LinearGradient>
+
+          {/* Progress Bar */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${(currentStep / 3) * 100}%` },
+                ]}
+              />
+            </View>
+          </View>
+
+          {/* Form Steps */}
+          <View style={styles.formContainer}>
+            {currentStep === 1 && renderProfessionalStep1()}
+            {currentStep === 2 && renderProfessionalStep2()}
+            {currentStep === 3 && renderProfessionalStep3()}
+          </View>
+
+          {/* Footer con botones */}
+          <View style={styles.footer}>
+            {currentStep > 1 && (
+              <TouchableOpacity
+                style={styles.backButtonFooter}
+                onPress={handleProfessionalBack}
+              >
+                <Text style={styles.backButtonText}>Atrás</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.nextButton,
+                currentStep === 1 && styles.nextButtonFull,
+              ]}
+              onPress={handleProfessionalNext}
+              disabled={professionalLoading}
+            >
+              {professionalLoading ? (
+                <ActivityIndicator size="small" color={theme.colors.white} />
+              ) : (
+                <>
+                  <Text style={styles.nextButtonText}>
+                    {currentStep === 3 ? "Completar Registro" : "Siguiente"}
+                  </Text>
+                  <Ionicons
+                    name="arrow-forward"
+                    size={20}
+                    color={theme.colors.white}
+                  />
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
+  );
+
+  // Renderizar según el estado
+  if (!roleSelected) {
+    return renderRoleSelection();
+  } else if (selectedRole === "client") {
+    return renderClientForm();
+  } else {
+    return renderProfessionalForm();
+  }
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+    width: "100%",
   },
   keyboardView: {
     flex: 1,
+    width: "100%",
   },
   scrollContent: {
     flexGrow: 1,
+    width: "100%",
   },
   header: {
     padding: theme.spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
     paddingTop: theme.spacing.xxl + 60,
     paddingBottom: theme.spacing.xl,
   },
   logoContainer: {
     marginBottom: theme.spacing.xl,
-    alignItems: 'center',
+    alignItems: "center",
   },
   logoCircle: {
     width: 120,
     height: 120,
     borderRadius: 60,
     backgroundColor: theme.colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   logoImage: {
     width: 120,
@@ -415,18 +1322,18 @@ const styles = StyleSheet.create({
     borderRadius: 100,
   },
   backButton: {
-    position: 'absolute',
+    position: "absolute",
     top: theme.spacing.xl + 60,
     left: theme.spacing.lg,
     zIndex: 1,
     padding: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
   },
 
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.white,
     marginBottom: theme.spacing.sm,
   },
@@ -437,27 +1344,19 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     flex: 1,
-    padding: theme.spacing.lg,
+    padding: 0,
     paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.xl,
     backgroundColor: theme.colors.white,
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
     marginTop: -20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+    width: "100%",
+    alignSelf: "center",
   },
   passwordContainer: {
-    position: 'relative',
+    position: "relative",
   },
   eyeButton: {
-    position: 'absolute',
+    position: "absolute",
     right: theme.spacing.md,
     top: 45,
     zIndex: 1,
@@ -467,26 +1366,26 @@ const styles = StyleSheet.create({
   },
   userTypeLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
   },
   userTypeButtons: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: theme.spacing.md,
   },
   userTypeButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: theme.spacing.lg,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.lg,
     borderWidth: 2,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.white,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -502,7 +1401,7 @@ const styles = StyleSheet.create({
   userTypeText: {
     marginLeft: theme.spacing.sm,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
     color: theme.colors.primary,
   },
   userTypeTextActive: {
@@ -513,9 +1412,9 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
   },
   loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: theme.spacing.xl,
     paddingVertical: theme.spacing.md,
     marginBottom: theme.spacing.xl,
@@ -527,24 +1426,29 @@ const styles = StyleSheet.create({
   loginLink: {
     color: theme.colors.primary,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   // Estilos para campos de profesionales
   professionalFields: {
     marginTop: theme.spacing.lg,
   },
+  // Estilos para el contenido del formulario
+  formContent: {
+    paddingHorizontal: theme.spacing.md,
+  },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.text,
     marginBottom: theme.spacing.lg,
   },
   inputContainer: {
-    marginBottom: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
   },
   inputLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
   },
@@ -554,38 +1458,39 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
   },
   categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.sm,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingHorizontal: theme.spacing.xs,
+    width: "100%",
   },
   categoryCard: {
-    width: '48%',
+    width: "48%",
     backgroundColor: theme.colors.white,
     borderRadius: theme.borderRadius.lg,
     padding: theme.spacing.sm,
-    alignItems: 'center',
+    alignItems: "center",
     borderWidth: 2,
     borderColor: theme.colors.border,
     marginBottom: theme.spacing.md,
   },
   categoryCardActive: {
     borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary + '10',
+    backgroundColor: theme.colors.primary + "10",
   },
   categoryIcon: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   categoryName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: theme.colors.text,
-    textAlign: 'center',
+    textAlign: "center",
   },
   experienceCard: {
     backgroundColor: theme.colors.white,
@@ -597,21 +1502,22 @@ const styles = StyleSheet.create({
   },
   experienceCardActive: {
     borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary + '10',
+    backgroundColor: theme.colors.primary + "10",
   },
   experienceText: {
     fontSize: 16,
     color: theme.colors.text,
-    textAlign: 'center',
+    textAlign: "center",
   },
   experienceTextActive: {
     color: theme.colors.primary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   addItemContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.xs,
+    width: "100%",
   },
   addItemInput: {
     flex: 1,
@@ -621,28 +1527,29 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   itemsList: {
-    marginTop: theme.spacing.sm,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
+    marginTop: theme.spacing.xs,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.xs,
+    width: "100%",
   },
   itemTag: {
-    backgroundColor: theme.colors.primary + '20',
+    backgroundColor: theme.colors.primary + "20",
     borderRadius: theme.borderRadius.full,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing.sm,
   },
   itemText: {
     color: theme.colors.primary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   clientInfo: {
     backgroundColor: theme.colors.surface,
@@ -653,7 +1560,223 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 20,
+  },
+  // Estilos para el formulario de profesional por pasos
+  stepContainer: {
+    padding: 0,
+    paddingHorizontal: 0,
+    backgroundColor: theme.colors.white,
+    marginBottom: theme.spacing.md,
+    width: "100%",
+    alignSelf: "center",
+  },
+  stepHeader: {
+    alignItems: "center",
+    marginBottom: theme.spacing.md,
+    paddingHorizontal: theme.spacing.md,
+  },
+  stepTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginTop: theme.spacing.sm,
+  },
+  stepSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+  },
+  progressContainer: {
+    height: 4,
+    backgroundColor: theme.colors.border + "20",
+    marginBottom: theme.spacing.lg,
+    width: "100%",
+    alignSelf: "center",
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: theme.colors.primary,
+    borderRadius: 4,
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: theme.colors.primary,
+    borderRadius: 4,
+  },
+  textArea: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    fontSize: 16,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.surface,
+  },
+  inputError: {
+    borderColor: theme.colors.error,
+  },
+  imageContainer: {
+    width: "100%",
+    height: 200,
+    borderRadius: theme.borderRadius.lg,
+    overflow: "hidden",
+    marginBottom: theme.spacing.md,
+    backgroundColor: theme.colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profileImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: theme.borderRadius.lg,
+  },
+  dniImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: theme.borderRadius.lg,
+  },
+  removeImageButton: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    borderRadius: theme.borderRadius.full,
+    padding: theme.spacing.xs,
+  },
+  imageSelectorContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: theme.spacing.md,
+  },
+  imageSelector: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+  },
+  imageSelectorText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    marginTop: theme.spacing.xs,
+  },
+  itemCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  // Estilos para la selección de rol
+  roleSelectionTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: theme.colors.white,
+    marginBottom: theme.spacing.sm,
+    textAlign: "center",
+  },
+  roleSelectionSubtitle: {
+    fontSize: 16,
+    color: theme.colors.white,
+    opacity: 0.9,
+    textAlign: "center",
+    marginBottom: theme.spacing.lg,
+  },
+  roleButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: theme.spacing.md,
+    width: "100%",
+  },
+  roleButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 3,
+  },
+  roleIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.primary + "10",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: theme.spacing.sm,
+  },
+  roleTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  roleDescription: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+  },
+  // Estilos para el footer
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 20,
+    paddingHorizontal: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl + 20,
+    width: "100%",
+    alignSelf: "center",
+  },
+  backButtonFooter: {
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  backButtonText: {
+    color: theme.colors.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  nextButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  nextButtonFull: {
+    flex: 1,
+    marginLeft: theme.spacing.md,
+  },
+  nextButtonText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontWeight: "600",
+    marginRight: theme.spacing.xs,
   },
 });
