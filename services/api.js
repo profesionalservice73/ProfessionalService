@@ -2,7 +2,7 @@ import { Alert } from "react-native";
 
 // Configuración de la API - IMPORTANTE: Cambiar por tu IP local
 // const API_BASE_URL = // 'http://192.168.0.94:3000/api/v1'
-const API_BASE_URL = "http://192.168.0.94:3000/api/v1"; // 'https://api-professional-service.vercel.app/api/v1';
+const API_BASE_URL = "http://192.168.0.78:3000/api/v1"; // 'https://api-professional-service.vercel.app/api/v1';
 // "http://192.168.0.94:3000/api/v1";
 
 // Clase para manejar las respuestas de la API
@@ -19,6 +19,7 @@ class ApiResponse {
 const apiRequest = async (endpoint, options = {}) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
+    console.log(`[API] Making request to: ${url}`);
 
     const defaultOptions = {
       headers: {
@@ -32,7 +33,10 @@ const apiRequest = async (endpoint, options = {}) => {
       ...options,
     });
 
+    console.log(`[API] Response status: ${response.status}`);
+
     const result = await response.json();
+    console.log(`[API] Response data:`, result);
 
     if (!response.ok) {
       throw new Error(result.error || "Error en la petición");
@@ -47,12 +51,14 @@ const apiRequest = async (endpoint, options = {}) => {
   } catch (error) {
     console.error("API Error:", error);
 
-    // Mostrar error al usuario
-    Alert.alert(
-      "Error de Conexión",
-      error.message || "No se pudo conectar con el servidor",
-      [{ text: "OK" }]
-    );
+    // Solo mostrar alerta si no es un error de red (para evitar spam de alertas)
+    if (error.name !== "TypeError" || !error.message.includes("fetch")) {
+      Alert.alert(
+        "Error de Conexión",
+        error.message || "No se pudo conectar con el servidor",
+        [{ text: "OK" }]
+      );
+    }
 
     return new ApiResponse(false, null, null, error.message);
   }
