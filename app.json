@@ -18,6 +18,9 @@
         "NSLocationWhenInUseUsageDescription": "Esta aplicación necesita acceso a tu ubicación para mostrar servicios cercanos y calcular distancias.",
         "NSPhotoLibraryUsageDescription": "Esta app necesita acceso a tu galería para seleccionar fotos del problema.",
         "NSCameraUsageDescription": "Esta app necesita acceso a tu cámara para tomar fotos del problema."
+      },
+      "config": {
+        "googleMapsApiKey": "REEMPLAZA_CON_TU_API_KEY_DE_GOOGLE_MAPS"
       }
     },
     "android": {
@@ -31,8 +34,14 @@
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "REEMPLAZA_CON_TU_API_KEY_DE_GOOGLE_MAPS"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/icon.png"
@@ -41,6 +50,14 @@
       "eas": {
         "projectId": "148ab5d8-e650-4a32-805b-0dde3cb30202"
       }
-    }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Esta aplicación necesita acceso a tu ubicación para mostrar servicios cercanos y calcular distancias."
+        }
+      ]
+    ]
   }
 }

@@ -106,7 +106,8 @@ const RequestCard = ({ request }: { request: any }) => (
 );
 
 export default function ProfessionalHomeScreen({ navigation }: any) {
-  const { professional, isRegistrationComplete } = useProfessional();
+  const { professional, isRegistrationComplete, loading } = useProfessional();
+  const isFocused = useIsFocused();
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     stats: {
       totalRequests: 0,
@@ -115,8 +116,16 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
     },
     recentRequests: [],
   });
-  const [loading, setLoading] = useState(true);
-  const isFocused = useIsFocused();
+  const [loadingData, setLoadingData] = useState(false);
+
+  // Verificar si el profesional ha completado su registro
+  useEffect(() => {
+    if (!loading && !isRegistrationComplete) {
+      console.log('ProfessionalHomeScreen - Usuario no ha completado registro, redirigiendo...');
+      // Redirigir al formulario de registro
+      navigation.replace('ProfessionalRegister');
+    }
+  }, [loading, isRegistrationComplete, navigation]);
 
   // Recargar cuando el profesional cambie (al volver a entrar a la app)
   useEffect(() => {
@@ -128,13 +137,12 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
   const loadDashboardData = async () => {
     if (!professional?.id) {
       console.log('No professional ID available, skipping dashboard load');
-      setLoading(false);
       return;
     }
 
     try {
       console.log('Loading dashboard data for professional:', professional.id);
-      setLoading(true);
+      setLoadingData(true);
       
       // Cargar datos del dashboard
       const dashboardResponse = await professionalAPI.getHome(professional.id);
@@ -171,7 +179,7 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
-      setLoading(false);
+      setLoadingData(false);
     }
   };
 
@@ -179,6 +187,63 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
     console.log('View all requests');
     navigation.navigate('Requests');
   };
+
+  // Renderizado condicional después de que todos los hooks se hayan ejecutado
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Dashboard" showBackButton={false} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.loadingText}>Cargando perfil...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Si no ha completado el registro, mostrar mensaje
+  if (!isRegistrationComplete) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Dashboard" showBackButton={false} />
+        <View style={styles.incompleteContainer}>
+          <Ionicons name="person-circle-outline" size={80} color={theme.colors.primary} />
+          <Text style={styles.incompleteTitle}>Perfil Incompleto</Text>
+          <Text style={styles.incompleteText}>
+            Necesitas completar tu perfil profesional para acceder al dashboard.
+          </Text>
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={() => navigation.navigate('ProfessionalRegister')}
+          >
+            <Text style={styles.completeButtonText}>Completar Registro</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Si no hay datos del profesional, mostrar error
+  if (!professional) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Header title="Dashboard" showBackButton={false} />
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={80} color={theme.colors.error} />
+          <Text style={styles.errorTitle}>Error al Cargar Perfil</Text>
+          <Text style={styles.errorText}>
+            No se pudieron cargar los datos de tu perfil profesional.
+          </Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.replace('ProfessionalRegister')}
+          >
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -202,7 +267,7 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
           </View>
         </LinearGradient>
 
-        {loading ? (
+        {loadingData ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>Cargando datos...</Text>
@@ -498,5 +563,69 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginRight: theme.spacing.sm,
+  },
+  incompleteContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  incompleteTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  incompleteText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: theme.spacing.xl,
+  },
+  completeButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+  },
+  completeButtonText: {
+    color: theme.colors.white,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.xl,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginTop: theme.spacing.lg,
+    marginBottom: theme.spacing.md,
+  },
+  errorText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: theme.spacing.xl,
+  },
+  retryButton: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
+    borderRadius: theme.borderRadius.lg,
+  },
+  retryButtonText: {
+    color: theme.colors.white,
+    fontSize: 18,
+    fontWeight: '600',
   },
 });

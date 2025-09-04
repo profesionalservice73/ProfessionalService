@@ -122,23 +122,15 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       {/* Detalles */}
       <View style={styles.details}>
         <View style={styles.detailItem}>
-          <Ionicons name="person-outline" size={16} color={theme.colors.textSecondary} />
+          <Ionicons name="time-outline" size={14} color={theme.colors.textSecondary} />
           <Text style={styles.detailText}>
-            {request.clientId?.fullName || 'Cliente'}
+            {formatDateForDisplay(request.createdAt)}
           </Text>
         </View>
-        
         <View style={styles.detailItem}>
-          <Ionicons name="calendar-outline" size={16} color={theme.colors.textSecondary} />
+          <Ionicons name="location-outline" size={14} color={theme.colors.textSecondary} />
           <Text style={styles.detailText}>
-            {formatDateForDisplay(request.preferredDate || request.createdAt)}
-          </Text>
-        </View>
-
-        <View style={styles.detailItem}>
-          <Ionicons name="cash-outline" size={16} color={theme.colors.textSecondary} />
-          <Text style={styles.detailText}>
-            {request.budget || 'No especificado'}
+            {request.location}
           </Text>
         </View>
       </View>

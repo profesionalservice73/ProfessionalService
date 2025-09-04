@@ -24,7 +24,6 @@ interface Request {
   title: string;
   client: string;
   location: string;
-  budget: string;
   status: string;
   date: string;
   description: string;

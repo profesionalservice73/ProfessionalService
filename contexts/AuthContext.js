@@ -28,23 +28,36 @@ export const AuthProvider = ({ children }) => {
       const storedUser = await AsyncStorage.getItem('user');
       const storedSessionId = await AsyncStorage.getItem('sessionId');
       
+      console.log('AuthContext - Stored user:', storedUser);
+      console.log('AuthContext - Stored session ID:', storedSessionId);
+      
       if (storedUser && storedSessionId) {
         const userData = JSON.parse(storedUser);
+        console.log('AuthContext - Parsed user data:', userData);
         
         // Validar si la sesión sigue siendo válida
         const sessionValidation = await sessionService.validateSession(storedSessionId);
+        console.log('AuthContext - Session validation result:', sessionValidation);
         
         if (sessionValidation.valid) {
           setUser(userData);
           setSessionId(storedSessionId);
-          console.log('Usuario autenticado cargado:', userData);
+          console.log('AuthContext - Usuario autenticado cargado:', userData);
+          
+          // Si es un profesional, verificar si necesita completar registro
+          if (userData.userType === 'professional') {
+            console.log('AuthContext - Usuario profesional detectado, verificando perfil...');
+          }
         } else {
           // Sesión inválida, limpiar datos
+          console.log('AuthContext - Session invalid, clearing data');
           await logout();
         }
+      } else {
+        console.log('AuthContext - No stored user or session found');
       }
     } catch (error) {
-      console.error('Error loading user from storage:', error);
+      console.error('AuthContext - Error loading user from storage:', error);
     } finally {
       setLoading(false);
     }
@@ -81,42 +94,74 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     try {
       setLoading(true);
-      const response = await authAPI.register(userData);
       
-      if (response.success) {
-        // Si es un profesional, completar automáticamente su registro
-        if (userData.userType === 'professional') {
+      // Para profesionales, solo registrar el usuario básico primero
+      if (userData.userType === 'professional') {
+        const basicUserData = {
+          fullName: userData.fullName,
+          email: userData.email,
+          phone: userData.phone,
+          password: userData.password,
+          confirmPassword: userData.confirmPassword,
+          userType: 'professional'
+        };
+        
+        const response = await authAPI.register(basicUserData);
+        
+        console.log('Respuesta del registro de usuario:', response);
+        console.log('Estructura de la respuesta:', {
+          success: response.success,
+          data: response.data,
+          message: response.message,
+          error: response.error
+        });
+        
+        if (response.success) {
+          // Ahora completar el registro profesional con todos los datos
           try {
             const { professionalAPI } = require('../services/api');
             const professionalData = {
-              specialty: userData.specialty,
+              specialties: userData.specialties,
               experience: userData.experience,
               description: userData.description,
               location: userData.location,
               availability: userData.availability,
               responseTime: userData.responseTime,
+              profileImage: userData.profileImage,
+              dniFrontImage: userData.dniFrontImage,
+              dniBackImage: userData.dniBackImage,
               services: userData.services,
               priceRange: userData.priceRange,
               certifications: userData.certifications,
+              certificationDocuments: userData.certificationDocuments,
               languages: userData.languages,
             };
             
-            const professionalResponse = await professionalAPI.completeRegistration(professionalData, response.data.user.id);
+            console.log('Completando registro profesional con datos:', professionalData);
+            console.log('ID del usuario registrado:', response.data.id);
+            
+            const professionalResponse = await professionalAPI.completeRegistration(professionalData, response.data.id);
             
             if (professionalResponse.success) {
-              return { success: true, message: 'Registro completado exitosamente. Ya puedes iniciar sesión.' };
+              return { 
+                success: true, 
+                message: 'Registro completado exitosamente. Ya puedes iniciar sesión.',
+                userId: response.data.id // Agregar el userId a la respuesta
+              };
             } else {
-              return { success: true, message: 'Usuario registrado. Completa tu perfil profesional más tarde.' };
+              return { success: false, message: professionalResponse.error || 'Error al completar el registro profesional' };
             }
           } catch (professionalError) {
             console.error('Error completing professional registration:', professionalError);
-            return { success: true, message: 'Usuario registrado. Completa tu perfil profesional más tarde.' };
+            return { success: false, message: 'Error al completar el registro profesional' };
           }
+        } else {
+          return { success: false, message: response.error };
         }
-        
-        return { success: true, message: response.message };
       } else {
-        return { success: false, message: response.error };
+        // Para clientes, registro normal
+        const response = await authAPI.register(userData);
+        return { success: response.success, message: response.success ? response.message : response.error };
       }
     } catch (error) {
       console.error('Register error:', error);

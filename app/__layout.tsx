@@ -21,8 +21,6 @@ import ProfessionalDetailScreen from './client/professional-detail';
 import CreateRequestScreen from './client/create-request';
 import EditRequestScreen from './client/edit-request';
 import ProfessionalLayout from './professional/__layout';
-import ProfessionalRegisterScreen from './professional/register';
-import ProfessionalRegisterStepsScreen from './professional/register-steps';
 import EditProfileScreen from './professional/edit-profile';
 import RequestDetailScreen from './professional/request-detail';
 import ReviewsScreen from './client/reviews';
@@ -141,8 +139,7 @@ const RootNavigator = () => {
         user?.userType === 'professional' ? (
           <>
             <Stack.Screen name="ProfessionalMain" component={ProfessionalLayout} />
-            <Stack.Screen name="ProfessionalRegister" component={ProfessionalRegisterScreen} />
-            <Stack.Screen name="ProfessionalRegisterSteps" component={ProfessionalRegisterStepsScreen} />
+
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
           </>
@@ -161,7 +158,6 @@ const RootNavigator = () => {
         // Usuario no autenticado - mostrar pantallas de auth
         <>
           <Stack.Screen name="Auth" component={AuthNavigator} />
-          <Stack.Screen name="ProfessionalRegisterSteps" component={ProfessionalRegisterStepsScreen} />
         </>
       )}
     </Stack.Navigator>

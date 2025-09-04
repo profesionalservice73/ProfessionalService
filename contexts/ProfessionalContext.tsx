@@ -7,7 +7,7 @@ interface ProfessionalData {
   name: string;
   email: string;
   phone: string;
-  specialty: string;
+  specialties: string[]; // Cambiar a specialties (plural)
   experience: string;
   description: string;
   location: string;
@@ -16,8 +16,12 @@ interface ProfessionalData {
   services: string[];
   priceRange: string;
   certifications: string[];
+  certificationDocuments: (string | null)[]; // Agregar documentos de certificación
   languages: string[];
   workPhotos: string[];
+  profileImage: string; // Agregar foto de perfil
+  dniFrontImage: string; // Agregar DNI frente
+  dniBackImage: string; // Agregar DNI dorso
   rating: number;
   totalReviews: number;
   isRegistrationComplete: boolean;
@@ -60,12 +64,17 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const response = await professionalAPI.getProfileByUserId(user.id);
       
       if (response.success && response.data) {
+        console.log('🔍 ProfessionalContext - Response del backend:', response.data);
+        console.log('🔍 ProfessionalContext - Especialidades del backend:', response.data.specialties);
+        console.log('🔍 ProfessionalContext - Tipo de especialidades:', typeof response.data.specialties);
+        console.log('🔍 ProfessionalContext - Es array?', Array.isArray(response.data.specialties));
+        
         const professionalData: ProfessionalData = {
           id: response.data.id,
           name: response.data.fullName,
           email: response.data.email,
           phone: response.data.phone,
-          specialty: response.data.specialty || '',
+          specialties: response.data.specialties || [], // Cambiar a especialidades
           experience: response.data.experience || '',
           description: response.data.description || '',
           location: response.data.location || '',
@@ -74,14 +83,23 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
           services: response.data.services || [],
           priceRange: response.data.priceRange || '',
           certifications: response.data.certifications || [],
+          certificationDocuments: response.data.certificationDocuments || [], // Agregar documentos
           languages: response.data.languages || [],
           workPhotos: response.data.workPhotos || [],
+          profileImage: response.data.profileImage || '',
+          dniFrontImage: response.data.dniFrontImage || '',
+          dniBackImage: response.data.dniBackImage || '',
           rating: response.data.rating || 0,
           totalReviews: response.data.totalReviews || 0,
           isRegistrationComplete: response.data.isRegistrationComplete ?? false,
         };
 
+        console.log('🔍 ProfessionalContext - ProfessionalData creado:', professionalData);
+        console.log('🔍 ProfessionalContext - Especialidades en ProfessionalData:', professionalData.specialties);
+
+        console.log('🔍 ProfessionalContext - Antes de setProfessional');
         setProfessional(professionalData);
+        console.log('🔍 ProfessionalContext - Después de setProfessional');
         setIsRegistrationComplete(professionalData.isRegistrationComplete);
       } else {
         setProfessional(null);
@@ -98,9 +116,15 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Cargar datos cuando el usuario cambia
   useEffect(() => {
+    console.log('🔍 ProfessionalContext - useEffect ejecutado');
+    console.log('🔍 ProfessionalContext - User:', user);
+    console.log('🔍 ProfessionalContext - UserType:', user?.userType);
+    
     if (user?.userType === 'professional') {
+      console.log('🔍 ProfessionalContext - Cargando datos del profesional...');
       loadProfessionalData();
     } else {
+      console.log('🔍 ProfessionalContext - Usuario no es profesional, limpiando estado');
       setLoading(false);
       setProfessional(null);
       setIsRegistrationComplete(false);
@@ -111,6 +135,7 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
     console.log('ProfessionalContext - updateProfessional:', data);
     if (professional) {
       const updated = { ...professional, ...data };
+      console.log('ProfessionalContext - Datos actualizados:', updated);
       setProfessional(updated);
       setIsRegistrationComplete(updated.isRegistrationComplete);
       console.log('ProfessionalContext - isRegistrationComplete actualizado:', updated.isRegistrationComplete);

@@ -3,182 +3,111 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
   Image,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Button } from '../../components/Button';
-import { Input } from '../../components/Input';
 import { theme } from '../../config/theme';
-import { Header } from '../../components/Header';
-import { EnhancedServiceIcon } from '../../components/EnhancedServiceIcon';
-import { clientAPI } from '../../services/api';
+import { Input } from '../../components/Input';
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
+import { clientAPI } from '../../services/api';
 
-const categories = [
-  { id: 'plomeria', name: 'Plomería', icon: 'water-outline', color: '#3b82f6' },
-  { id: 'gas', name: 'Gas', icon: 'flame-outline', color: '#f97316' },
-  { id: 'electricidad', name: 'Electricidad', icon: 'flash-outline', color: '#ef4444' },
-  { id: 'albanileria', name: 'Albañilería', icon: 'construct-outline', color: '#f59e0b' },
-  { id: 'carpinteria', name: 'Carpintería', icon: 'hammer-outline', color: '#8b4513' },
-  { id: 'herreria', name: 'Herrería', icon: 'hardware-chip-outline', color: '#64748b' },
-  { id: 'limpieza', name: 'Limpieza', icon: 'sparkles-outline', color: '#10b981' },
-  { id: 'mecanica', name: 'Mecánica', icon: 'car-outline', color: '#1e293b' },
-  { id: 'aire_acondicionado', name: 'Aire Acondicionado', icon: 'thermometer-outline', color: '#0ea5e9' },
-  { id: 'tecnico_comp_redes', name: 'Técnico en Comp y Redes', icon: 'laptop-outline', color: '#6366f1' },
-  { id: 'cerrajeria', name: 'Cerrajería', icon: 'key-outline', color: '#7c3aed' },
-];
-
-const urgencyLevels = [
-  { id: 'low', name: 'Baja', color: theme.colors.success, icon: 'time-outline' },
-  { id: 'medium', name: 'Media', color: theme.colors.warning, icon: 'time-outline' },
-  { id: 'high', name: 'Alta', color: theme.colors.error, icon: 'time-outline' },
-];
-
-export default function CreateRequestScreen({ navigation, route }: any) {
+export default function CreateRequestScreen() {
+  const navigation = useNavigation();
   const { user } = useAuth();
-  const { categoryId } = route.params || {};
-  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: categoryId || '',
-    urgency: '',
-    budget: '',
+    serviceType: '',
     location: '',
-    preferredDate: '',
-    contactPhone: '',
+    images: [] as string[],
   });
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const updateFormData = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
+  const updateFormData = (field: string, value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  const requestPermissions = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permisos Requeridos',
-        'Necesitamos acceso a tu galería para seleccionar fotos del problema.',
-        [{ text: 'OK' }]
-      );
-      return false;
-    }
-    return true;
-  };
-
-  const selectImage = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
-
+  const pickImage = async () => {
     try {
+      // Solicitar permisos de cámara y galería
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permisos requeridos', 'Necesitamos acceso a tu galería para seleccionar fotos');
+        return;
+      }
+
+      // Abrir selector de imágenes
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        allowsMultipleSelection: false,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]) {
-        setSelectedImage(result.assets[0].uri);
-        if (errors.image) {
-          setErrors(prev => ({ ...prev, image: '' }));
-        }
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImageUri = result.assets[0].uri;
+        setSelectedImage(selectedImageUri);
+        updateFormData('images', [selectedImageUri]);
+        console.log('🔍 Imagen seleccionada:', selectedImageUri);
       }
     } catch (error) {
-      console.error('Error selecting image:', error);
+      console.error('Error seleccionando imagen:', error);
       Alert.alert('Error', 'No se pudo seleccionar la imagen');
     }
   };
 
   const removeImage = () => {
     setSelectedImage(null);
-    setErrors(prev => ({ ...prev, image: '' }));
-  };
-
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.title.trim()) {
-      newErrors.title = 'El título es requerido';
-    }
-
-    if (!formData.description.trim()) {
-      newErrors.description = 'La descripción es requerida';
-    }
-
-    if (!formData.category) {
-      newErrors.category = 'Selecciona una categoría';
-    }
-
-    if (!formData.urgency) {
-      newErrors.urgency = 'Selecciona el nivel de urgencia';
-    }
-
-    if (!formData.location.trim()) {
-      newErrors.location = 'La ubicación es requerida';
-    }
-
-    if (!formData.contactPhone.trim()) {
-      newErrors.contactPhone = 'El teléfono de contacto es requerido';
-    }
-
-    if (!selectedImage) {
-      newErrors.image = 'Debes seleccionar una foto del problema';
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return false;
-    }
-
-    return true;
+    updateFormData('images', []);
   };
 
   const handleSubmit = async () => {
-    if (!validateForm()) return;
+    if (!formData.title || !formData.description || !formData.serviceType || !formData.location) {
+      Alert.alert('Error', 'Por favor completa todos los campos obligatorios');
+      return;
+    }
+
     if (!user?.id) {
       Alert.alert('Error', 'No se pudo identificar al usuario');
       return;
     }
 
-    setLoading(true);
-    
+    setIsSubmitting(true);
+
     try {
-      const requestData: any = {
+      const requestData = {
         clientId: user.id,
         title: formData.title,
-        category: formData.category,
+        category: formData.serviceType,
         description: formData.description,
         location: formData.location,
-        budget: formData.budget,
-        urgency: formData.urgency,
-        contactPhone: formData.contactPhone,
-        image: selectedImage, // Incluir la imagen seleccionada
+        images: formData.images,
+        urgency: 'medium', // Por defecto
+        budget: 'No especificado', // Por defecto
+        preferredDate: null, // Por defecto
+        contactPhone: user.phone || null,
       };
 
-      // Solo incluir preferredDate si no está vacío
-      if (formData.preferredDate && formData.preferredDate.trim() !== '') {
-        requestData.preferredDate = formData.preferredDate;
-      }
-
+      console.log('🔍 Enviando solicitud:', requestData);
+      
+      // Enviar al backend real
       const response = await clientAPI.createRequest(requestData);
       
       if (response.success) {
         Alert.alert(
           'Solicitud Creada',
-          'Tu solicitud ha sido creada exitosamente. Los profesionales recibirán una notificación.',
+          'Tu solicitud de servicio ha sido creada exitosamente. Los profesionales podrán verla y contactarte.',
           [
             {
               text: 'OK',
@@ -187,120 +116,75 @@ export default function CreateRequestScreen({ navigation, route }: any) {
           ]
         );
       } else {
-        Alert.alert('Error', response.error || 'Error al crear la solicitud');
+        throw new Error(response.error || 'Error desconocido');
       }
+      
     } catch (error) {
-      console.error('Error creando solicitud:', error);
-      Alert.alert('Error', 'Error de conexión al crear la solicitud');
+      console.error('Error al crear la solicitud:', error);
+      Alert.alert('Error', 'No se pudo crear la solicitud. Inténtalo de nuevo.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
+  const serviceTypes = [
+    'Plomería',
+    'Electricidad',
+    'Limpieza',
+    'Pintura',
+    'Jardinería',
+    'Albañilería',
+    'Otros'
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header con logo */}
-        <Header 
-          title="Nueva Solicitud" 
-          showBackButton={true}
-          onBackPress={() => navigation.goBack()}
-        />
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Crear Solicitud de Servicio</Text>
+        </View>
 
-        <View style={styles.content}>
+        <View style={styles.form}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Foto del Problema</Text>
-            {errors.image && (
-              <Text style={styles.errorText}>{errors.image}</Text>
-            )}
-            
-            {selectedImage ? (
-              <View style={styles.imageContainer}>
-                <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
-                <TouchableOpacity style={styles.removeImageButton} onPress={removeImage}>
-                  <Ionicons name="close-circle" size={24} color={theme.colors.error} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.imageSelector} onPress={selectImage}>
-                <Ionicons name="camera-outline" size={48} color={theme.colors.textSecondary} />
-                <Text style={styles.imageSelectorText}>Seleccionar foto del problema</Text>
-                <Text style={styles.imageSelectorSubtext}>Toca para elegir desde tu galería</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Información del Servicio</Text>
+            <Text style={styles.sectionTitle}>Información Básica</Text>
             
             <Input
               label="Título de la solicitud"
-              placeholder="Ej: Reparación de tubería en baño"
+              placeholder="Ej: Necesito un plomero urgente"
               value={formData.title}
               onChangeText={(value) => updateFormData('title', value)}
-              error={errors.title}
             />
 
             <Input
-              label="Descripción detallada"
-              placeholder="Describe el problema o servicio que necesitas..."
+              label="Descripción del problema"
+              placeholder="Describe detalladamente el problema que necesitas resolver..."
               value={formData.description}
               onChangeText={(value) => updateFormData('description', value)}
               multiline
               numberOfLines={4}
-              error={errors.description}
             />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Categoría</Text>
-            {errors.category && (
-              <Text style={styles.errorText}>{errors.category}</Text>
-            )}
-            <View style={styles.categoriesGrid}>
-              {categories.map((category) => (
+            <Text style={styles.sectionTitle}>Tipo de Servicio</Text>
+            <View style={styles.serviceTypesGrid}>
+              {serviceTypes.map((type) => (
                 <TouchableOpacity
-                  key={category.id}
+                  key={type}
                   style={[
-                    styles.categoryCard,
-                    formData.category === category.id && styles.categoryCardActive,
+                    styles.serviceTypeCard,
+                    formData.serviceType === type && styles.serviceTypeCardActive,
                   ]}
-                  onPress={() => updateFormData('category', category.id)}
+                  onPress={() => updateFormData('serviceType', type)}
                 >
-                  <EnhancedServiceIcon type={category.id} size={50} />
-                  <Text style={styles.categoryName}>{category.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Nivel de Urgencia</Text>
-            {errors.urgency && (
-              <Text style={styles.errorText}>{errors.urgency}</Text>
-            )}
-            <View style={styles.urgencyContainer}>
-              {urgencyLevels.map((level) => (
-                <TouchableOpacity
-                  key={level.id}
-                  style={[
-                    styles.urgencyCard,
-                    formData.urgency === level.id && styles.urgencyCardActive,
-                  ]}
-                  onPress={() => updateFormData('urgency', level.id)}
-                >
-                  <Ionicons
-                    name={level.icon as any}
-                    size={20}
-                    color={formData.urgency === level.id ? theme.colors.white : level.color}
-                  />
-                  <Text
-                    style={[
-                      styles.urgencyText,
-                      formData.urgency === level.id && styles.urgencyTextActive,
-                    ]}
-                  >
-                    {level.name}
+                  <Text style={[
+                    styles.serviceTypeText,
+                    formData.serviceType === type && styles.serviceTypeTextActive,
+                  ]}>
+                    {type}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -308,59 +192,61 @@ export default function CreateRequestScreen({ navigation, route }: any) {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Detalles Adicionales</Text>
-            
+            <Text style={styles.sectionTitle}>Ubicación</Text>
             <Input
-              label="Presupuesto estimado (opcional)"
-              placeholder="Ej: $50 - $100"
-              value={formData.budget}
-              onChangeText={(value) => updateFormData('budget', value)}
-            />
-
-            <Input
-              label="Ubicación"
-              placeholder="Dirección donde se realizará el trabajo"
+              label="Dirección del servicio"
+              placeholder="Ingresa la dirección donde se realizará el trabajo"
               value={formData.location}
               onChangeText={(value) => updateFormData('location', value)}
-              error={errors.location}
-            />
-
-            <Input
-              label="Fecha preferida (opcional)"
-              placeholder="Ej: 15 de enero, 2024 o 2024-12-25"
-              value={formData.preferredDate}
-              onChangeText={(value) => updateFormData('preferredDate', value)}
-            />
-            <Text style={styles.helpText}>
-              Formatos válidos: "15 de enero, 2024", "2024-12-25", "25/12/2024"
-            </Text>
-
-            <Input
-              label="Teléfono de contacto"
-              placeholder="+506 8888 8888"
-              value={formData.contactPhone}
-              onChangeText={(value) => updateFormData('contactPhone', value)}
-              keyboardType="phone-pad"
-              error={errors.contactPhone}
             />
           </View>
 
-          <View style={styles.submitContainer}>
-            <Button
-              title={loading ? "Creando..." : "Crear Solicitud"}
-              onPress={handleSubmit}
-              style={styles.submitButton}
-              disabled={loading}
-            />
-            {loading && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={theme.colors.primary} />
-                <Text style={styles.loadingText}>Guardando solicitud...</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Fotos del Problema</Text>
+            <Text style={styles.sectionSubtitle}>
+              Agrega fotos para que los profesionales entiendan mejor el problema
+            </Text>
+            
+            {selectedImage ? (
+              <View style={styles.imageContainer}>
+                <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
+                <View style={styles.imageActions}>
+                  <TouchableOpacity style={styles.imageActionButton} onPress={pickImage}>
+                    <Ionicons name="camera" size={20} color={theme.colors.primary} />
+                    <Text style={styles.imageActionText}>Cambiar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.imageActionButton} onPress={removeImage}>
+                    <Ionicons name="trash" size={20} color={theme.colors.error} />
+                    <Text style={styles.imageActionText}>Eliminar</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+            ) : (
+              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+                <View style={styles.imagePlaceholder}>
+                  <Ionicons name="camera" size={40} color={theme.colors.textSecondary} />
+                  <Text style={styles.imagePlaceholderText}>Agregar foto del problema</Text>
+                  <Text style={styles.imagePlaceholderSubtext}>
+                    Toca aquí para seleccionar una imagen
+                  </Text>
+                </View>
+              </TouchableOpacity>
             )}
           </View>
         </View>
       </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]} 
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          <Text style={styles.submitButtonText}>
+            {isSubmitting ? 'Creando Solicitud...' : 'Crear Solicitud'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -373,10 +259,29 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  section: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: theme.spacing.xl + theme.spacing.lg,
+    paddingBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
     backgroundColor: theme.colors.white,
-    marginBottom: theme.spacing.md,
+  },
+  backButton: {
+    marginRight: theme.spacing.md,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  form: {
     padding: theme.spacing.lg,
+  },
+  section: {
+    marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
     fontSize: 18,
@@ -384,135 +289,117 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginBottom: theme.spacing.md,
   },
-  errorText: {
-    color: theme.colors.error,
-    fontSize: 14,
-    marginBottom: theme.spacing.sm,
+  serviceTypesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
   },
-  // Estilos para selección de imagen
-  imageSelector: {
+  serviceTypeCard: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.white,
+  },
+  serviceTypeCardActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  serviceTypeText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: '500',
+  },
+  serviceTypeTextActive: {
+    color: theme.colors.white,
+    fontWeight: '600',
+  },
+  imagePicker: {
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 2,
     borderColor: theme.colors.border,
     borderStyle: 'dashed',
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.xl,
+  },
+  imagePlaceholder: {
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
   },
-  imageSelectorText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: theme.colors.text,
+  imagePlaceholderText: {
     marginTop: theme.spacing.sm,
-  },
-  imageSelectorSubtext: {
-    fontSize: 14,
+    fontSize: 16,
     color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
-    textAlign: 'center',
-  },
-  imageContainer: {
-    position: 'relative',
-    borderRadius: theme.borderRadius.md,
-    overflow: 'hidden',
   },
   selectedImage: {
-    width: '100%',
-    height: 200,
+    width: 200,
+    height: 150,
     borderRadius: theme.borderRadius.md,
   },
-  removeImageButton: {
-    position: 'absolute',
-    top: theme.spacing.sm,
-    right: theme.spacing.sm,
-    backgroundColor: theme.colors.white,
-    borderRadius: theme.borderRadius.full,
-    padding: theme.spacing.xs,
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.sm,
-  },
-  categoryCard: {
-    width: '48%',
-    alignItems: 'center',
-    marginBottom: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.xs,
-  },
-  categoryCardActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 2,
-  },
-  categoryName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.text,
-    textAlign: 'center',
-    marginTop: theme.spacing.sm,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-    lineHeight: 18,
-  },
-  urgencyContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  urgencyCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    marginHorizontal: theme.spacing.xs,
-  },
-  urgencyCardActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
-  },
-  urgencyText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.text,
-    marginLeft: theme.spacing.xs,
-  },
-  urgencyTextActive: {
-    color: theme.colors.white,
-  },
-  submitContainer: {
-    padding: theme.spacing.lg,
+  footer: {
     paddingBottom: 60,
-    backgroundColor: theme.colors.white,
+    padding: theme.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   submitButton: {
     backgroundColor: theme.colors.primary,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.md,
   },
-  loadingText: {
-    marginLeft: theme.spacing.sm,
+  submitButtonDisabled: {
+    backgroundColor: theme.colors.textSecondary,
+    opacity: 0.7,
+  },
+  submitButtonText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Estilos para subtítulos de sección
+  sectionSubtitle: {
     fontSize: 14,
     color: theme.colors.textSecondary,
-  },
-  helpText: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
     marginBottom: theme.spacing.md,
-    fontStyle: 'italic',
+    lineHeight: 20,
+  },
+  // Estilos para contenedor de imagen
+  imageContainer: {
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+  },
+  // Estilos para acciones de imagen
+  imageActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  imageActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.white,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: theme.spacing.xs,
+  },
+  imageActionText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // Estilos para texto del placeholder
+  imagePlaceholderSubtext: {
+    marginTop: theme.spacing.xs,
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
   },
 });
 

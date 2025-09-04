@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
@@ -29,6 +30,8 @@ export default function RequestDetailScreen({ route, navigation }: any) {
   const { updateRequestStatus } = useRequests();
   const [request, setRequest] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
 
   useEffect(() => {
     loadRequestDetail();
@@ -211,6 +214,11 @@ export default function RequestDetailScreen({ route, navigation }: any) {
     }
   };
 
+  const handleImagePress = (imageUri: string) => {
+    setSelectedImage(imageUri);
+    setImageModalVisible(true);
+  };
+
   const handleCancelRequest = async () => {
     if (!request || !professional?.id) return;
 
@@ -325,14 +333,29 @@ export default function RequestDetailScreen({ route, navigation }: any) {
 
           <Text style={styles.category}>{request.category}</Text>
 
-          {/* Imagen del problema */}
-          <View style={styles.imageContainer}>
-            {request.image ? (
-              <Image
-                source={{ uri: request.image }}
-                style={styles.problemImage}
-                resizeMode="cover"
-              />
+          {/* Imágenes del problema */}
+          <View style={styles.imagesSection}>
+            <Text style={styles.imagesSectionTitle}>Foto del Problema</Text>
+            
+            {request.images && request.images.length > 0 ? (
+              <View style={styles.imagesContainer}>
+                {request.images.map((imageUri: string, index: number) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.imageItem}
+                    onPress={() => handleImagePress(imageUri)}
+                  >
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.problemImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.imageOverlay}>
+                      <Ionicons name="expand-outline" size={20} color={theme.colors.white} />
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             ) : (
               <View style={styles.noImageContainer}>
                 <Ionicons
@@ -341,6 +364,9 @@ export default function RequestDetailScreen({ route, navigation }: any) {
                   color={theme.colors.textSecondary}
                 />
                 <Text style={styles.noImageText}>Sin foto del problema</Text>
+                <Text style={styles.noImageSubtext}>
+                  El cliente no ha subido foto para esta solicitud
+                </Text>
               </View>
             )}
           </View>
@@ -367,12 +393,12 @@ export default function RequestDetailScreen({ route, navigation }: any) {
 
             <View style={styles.serviceInfoItem}>
               <Ionicons
-                name="cash-outline"
+                name="location-outline"
                 size={20}
                 color={theme.colors.primary}
               />
               <Text style={styles.serviceInfoText}>
-                ${request.budget || "No especificado"}
+                {request.location}
               </Text>
             </View>
 
@@ -507,6 +533,38 @@ export default function RequestDetailScreen({ route, navigation }: any) {
             </View>
           )}
       </ScrollView>
+
+      {/* Modal para ver imagen en pantalla completa */}
+      <Modal
+        visible={imageModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Foto del Problema</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setImageModalVisible(false)}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.imageScrollContainer}>
+              <Image
+                source={{ uri: selectedImage || '' }}
+                style={styles.modalImage}
+                resizeMode="contain"
+                onLoad={() => console.log('🔍 Imagen cargada en modal')}
+                onError={(error) => console.error('Error cargando imagen:', error)}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -747,5 +805,81 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginLeft: theme.spacing.sm,
+  },
+  // Estilos para la sección de imágenes
+  imagesSection: {
+    marginTop: theme.spacing.md,
+  },
+  imagesSectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.md,
+  },
+  imagesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: theme.spacing.sm,
+  },
+  imageItem: {
+    position: "relative",
+    width: (width - theme.spacing.lg * 2 - theme.spacing.sm) / 2,
+    height: 120,
+    borderRadius: theme.borderRadius.md,
+    overflow: "hidden",
+  },
+  imageOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  noImageSubtext: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    marginTop: theme.spacing.xs,
+  },
+  // Estilos para el modal de imagen
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.9)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: width,
+    height: "100%",
+    backgroundColor: theme.colors.background,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: theme.spacing.lg,
+    backgroundColor: theme.colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.text,
+  },
+  closeButton: {
+    padding: theme.spacing.sm,
+  },
+  imageScrollContainer: {
+    flex: 1,
+    padding: theme.spacing.lg,
+  },
+  modalImage: {
+    width: width - theme.spacing.lg * 2,
+    height: width - theme.spacing.lg * 2,
+    borderRadius: theme.borderRadius.md,
   },
 });

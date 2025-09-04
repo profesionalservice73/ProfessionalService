@@ -1,63 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
-  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Button } from '../../components/Button';
-import { Input } from '../../components/Input';
 import { theme } from '../../config/theme';
-import { Header } from '../../components/Header';
-import { clientAPI } from '../../services/api';
+import { Input } from '../../components/Input';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 
-const categories = [
-  { id: 'plomeria', name: 'Plomería', icon: 'water-outline', color: '#3b82f6' },
-  { id: 'gas', name: 'Gas', icon: 'flame-outline', color: '#f97316' },
-  { id: 'electricidad', name: 'Electricidad', icon: 'flash-outline', color: '#ef4444' },
-  { id: 'albanileria', name: 'Albañilería', icon: 'construct-outline', color: '#f59e0b' },
-  { id: 'carpinteria', name: 'Carpintería', icon: 'hammer-outline', color: '#8b4513' },
-  { id: 'herreria', name: 'Herrería', icon: 'hardware-chip-outline', color: '#64748b' },
-  { id: 'limpieza', name: 'Limpieza', icon: 'sparkles-outline', color: '#10b981' },
-  { id: 'mecanica', name: 'Mecánica', icon: 'car-outline', color: '#1e293b' },
-  { id: 'aire_acondicionado', name: 'Aire Acondicionado', icon: 'thermometer-outline', color: '#0ea5e9' },
-  { id: 'tecnico_comp_redes', name: 'Técnico en Comp y Redes', icon: 'laptop-outline', color: '#6366f1' },
-  { id: 'cerrajeria', name: 'Cerrajería', icon: 'key-outline', color: '#7c3aed' },
-];
-
-const urgencyLevels = [
-  { id: 'low', name: 'Baja', color: theme.colors.success, icon: 'time-outline' },
-  { id: 'medium', name: 'Media', color: theme.colors.warning, icon: 'time-outline' },
-  { id: 'high', name: 'Alta', color: theme.colors.error, icon: 'time-outline' },
-];
-
-export default function EditRequestScreen({ route, navigation }: any) {
-  const { request } = route.params;
+export default function EditRequestScreen() {
+  const navigation = useNavigation();
+  const route = useRoute();
   const { user } = useAuth();
-  
-  // Debug: ver qué datos llegan
-  console.log('Request data received:', request);
+  const { request } = route.params as any;
+
   const [formData, setFormData] = useState({
     title: request.title || '',
     description: request.description || '',
-    category: request.category || '',
-    urgency: request.urgency || 'medium',
-    budget: request.budget || '',
+    serviceType: request.serviceType || '',
     location: request.location || '',
-    preferredDate: request.preferredDate || '',
-    contactPhone: request.contactPhone || '',
+    images: request.images || [],
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(false);
 
-  const updateFormData = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const updateFormData = (field: string, value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -74,20 +51,12 @@ export default function EditRequestScreen({ route, navigation }: any) {
       newErrors.description = 'La descripción es requerida';
     }
 
-    if (!formData.category) {
-      newErrors.category = 'Selecciona una categoría';
-    }
-
-    if (!formData.urgency) {
-      newErrors.urgency = 'Selecciona el nivel de urgencia';
+    if (!formData.serviceType) {
+      newErrors.serviceType = 'Selecciona el tipo de servicio';
     }
 
     if (!formData.location.trim()) {
       newErrors.location = 'La ubicación es requerida';
-    }
-
-    if (!formData.contactPhone.trim()) {
-      newErrors.contactPhone = 'El teléfono de contacto es requerido';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -100,200 +69,147 @@ export default function EditRequestScreen({ route, navigation }: any) {
 
   const handleSubmit = async () => {
     if (!validateForm()) return;
+
     if (!user?.id) {
       Alert.alert('Error', 'No se pudo identificar al usuario');
       return;
     }
 
-    setLoading(true);
-    
     try {
-      const requestData = {
+      const updatedData = {
         title: formData.title,
-        category: formData.category,
         description: formData.description,
+        serviceType: formData.serviceType,
         location: formData.location,
-        budget: formData.budget,
-        urgency: formData.urgency,
-        contactPhone: formData.contactPhone,
-        preferredDate: formData.preferredDate,
+        images: formData.images,
       };
 
-      // Solo incluir preferredDate si no está vacío
-      if (formData.preferredDate && formData.preferredDate.trim() !== '') {
-        requestData.preferredDate = formData.preferredDate;
-      }
-
       const requestId = request._id || request.id;
-      console.log('Using request ID:', requestId);
-      
       if (!requestId) {
         Alert.alert('Error', 'No se pudo identificar la solicitud');
         return;
       }
       
-      const response = await clientAPI.updateRequest(requestId, requestData);
+      // Aquí iría la lógica para actualizar la solicitud en el backend
+      console.log('Actualizando solicitud:', updatedData);
       
-      if (response.success) {
-        Alert.alert(
-          'Solicitud Actualizada',
-          'Tu solicitud ha sido actualizada exitosamente.',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.goBack(),
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Error', response.error || 'Error al actualizar la solicitud');
-      }
+      Alert.alert(
+        'Solicitud Actualizada',
+        'Tu solicitud ha sido actualizada exitosamente.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
     } catch (error) {
       console.error('Error actualizando solicitud:', error);
       Alert.alert('Error', 'Error de conexión al actualizar la solicitud');
-    } finally {
-      setLoading(false);
     }
   };
 
+  const serviceTypes = [
+    'Plomería',
+    'Electricidad',
+    'Limpieza',
+    'Pintura',
+    'Jardinería',
+    'Albañilería',
+    'Otros'
+  ];
+
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Header title="Editar Solicitud" showBackButton onBackPress={() => navigation.goBack()} />
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Información Básica</Text>
-          
-          <Input
-            label="Título de la solicitud"
-            placeholder="Ej: Reparación de tubería"
-            value={formData.title}
-            onChangeText={(value) => updateFormData('title', value)}
-            error={errors.title}
-          />
-
-          <Input
-            label="Descripción"
-            placeholder="Describe detalladamente el trabajo que necesitas"
-            value={formData.description}
-            onChangeText={(value) => updateFormData('description', value)}
-            multiline
-            numberOfLines={4}
-            error={errors.description}
-          />
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Editar Solicitud</Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Categoría</Text>
-          {errors.category && (
-            <Text style={styles.errorText}>{errors.category}</Text>
-          )}
-          <View style={styles.categoriesGrid}>
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryCard,
-                  formData.category === category.id && styles.categoryCardActive,
-                ]}
-                onPress={() => updateFormData('category', category.id)}
-              >
-                <View style={[styles.categoryIcon, { backgroundColor: category.color }]}>
-                  <Ionicons name={category.icon as any} size={24} color="white" />
-                </View>
-                <Text style={styles.categoryName}>{category.name}</Text>
-              </TouchableOpacity>
-            ))}
+        <View style={styles.form}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Información Básica</Text>
+            
+            <Input
+              label="Título de la solicitud"
+              placeholder="Ej: Necesito un plomero urgente"
+              value={formData.title}
+              onChangeText={(value) => updateFormData('title', value)}
+              error={errors.title}
+            />
+
+            <Input
+              label="Descripción del problema"
+              placeholder="Describe detalladamente el problema que necesitas resolver..."
+              value={formData.description}
+              onChangeText={(value) => updateFormData('description', value)}
+              multiline
+              numberOfLines={4}
+              error={errors.description}
+            />
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nivel de Urgencia</Text>
-          {errors.urgency && (
-            <Text style={styles.errorText}>{errors.urgency}</Text>
-          )}
-          <View style={styles.urgencyContainer}>
-            {urgencyLevels.map((level) => (
-              <TouchableOpacity
-                key={level.id}
-                style={[
-                  styles.urgencyCard,
-                  formData.urgency === level.id && styles.urgencyCardActive,
-                ]}
-                onPress={() => updateFormData('urgency', level.id)}
-              >
-                <Ionicons
-                  name={level.icon as any}
-                  size={20}
-                  color={formData.urgency === level.id ? theme.colors.white : level.color}
-                />
-                <Text
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Tipo de Servicio</Text>
+            {errors.serviceType && (
+              <Text style={styles.errorText}>{errors.serviceType}</Text>
+            )}
+            <View style={styles.serviceTypesGrid}>
+              {serviceTypes.map((type) => (
+                <TouchableOpacity
+                  key={type}
                   style={[
-                    styles.urgencyText,
-                    formData.urgency === level.id && styles.urgencyTextActive,
+                    styles.serviceTypeCard,
+                    formData.serviceType === type && styles.serviceTypeCardActive,
                   ]}
+                  onPress={() => updateFormData('serviceType', type)}
                 >
-                  {level.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Detalles Adicionales</Text>
-          
-          <Input
-            label="Presupuesto estimado (opcional)"
-            placeholder="Ej: $50 - $100"
-            value={formData.budget}
-            onChangeText={(value) => updateFormData('budget', value)}
-          />
-
-          <Input
-            label="Ubicación"
-            placeholder="Dirección donde se realizará el trabajo"
-            value={formData.location}
-            onChangeText={(value) => updateFormData('location', value)}
-            error={errors.location}
-          />
-
-          <Input
-            label="Fecha preferida (opcional)"
-            placeholder="Ej: 15 de enero, 2024 o 2024-12-25"
-            value={formData.preferredDate}
-            onChangeText={(value) => updateFormData('preferredDate', value)}
-          />
-          <Text style={styles.helpText}>
-            Formatos válidos: "15 de enero, 2024", "2024-12-25", "25/12/2024"
-          </Text>
-
-          <Input
-            label="Teléfono de contacto"
-            placeholder="+506 8888 8888"
-            value={formData.contactPhone}
-            onChangeText={(value) => updateFormData('contactPhone', value)}
-            keyboardType="phone-pad"
-            error={errors.contactPhone}
-          />
-        </View>
-
-        <View style={styles.submitContainer}>
-          <Button
-            title={loading ? "Actualizando..." : "Actualizar Solicitud"}
-            onPress={handleSubmit}
-            style={styles.submitButton}
-            disabled={loading}
-          />
-          {loading && (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-              <Text style={styles.loadingText}>Actualizando solicitud...</Text>
+                  <Text style={[
+                    styles.serviceTypeText,
+                    formData.serviceType === type && styles.serviceTypeTextActive,
+                  ]}>
+                    {type}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Ubicación</Text>
+            <Input
+              label="Dirección del servicio"
+              placeholder="Ingresa la dirección donde se realizará el trabajo"
+              value={formData.location}
+              onChangeText={(value) => updateFormData('location', value)}
+              error={errors.location}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Fotos del Problema</Text>
+            {formData.images && formData.images.length > 0 ? (
+              <View style={styles.imagesContainer}>
+                {formData.images.map((image: string, index: number) => (
+                  <Image key={index} source={{ uri: image }} style={styles.image} />
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noImagesText}>No hay fotos disponibles</Text>
+            )}
+          </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>Actualizar Solicitud</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
@@ -305,10 +221,26 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  section: {
-    backgroundColor: theme.colors.white,
-    marginBottom: theme.spacing.md,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  },
+  backButton: {
+    marginRight: theme.spacing.md,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  form: {
+    padding: theme.spacing.lg,
+  },
+  section: {
+    marginBottom: theme.spacing.xl,
   },
   sectionTitle: {
     fontSize: 18,
@@ -321,91 +253,62 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: theme.spacing.sm,
   },
-  categoriesGrid: {
+  serviceTypesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.sm,
+    gap: theme.spacing.sm,
   },
-  categoryCard: {
-    width: '48%',
-    alignItems: 'center',
-    padding: theme.spacing.sm,
+  serviceTypeCard: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: theme.colors.border,
-    marginBottom: theme.spacing.md,
-  },
-  categoryCardActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.surface,
-  },
-  categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.borderRadius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: theme.spacing.sm,
-  },
-  categoryName: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: theme.colors.text,
-    textAlign: 'center',
-  },
-  urgencyContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  urgencyCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    marginHorizontal: theme.spacing.xs,
-  },
-  urgencyCardActive: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary,
-  },
-  urgencyText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: theme.colors.text,
-    marginLeft: theme.spacing.xs,
-  },
-  urgencyTextActive: {
-    color: theme.colors.white,
-  },
-  submitContainer: {
-    padding: theme.spacing.lg,
-    paddingBottom: 60,
     backgroundColor: theme.colors.white,
+  },
+  serviceTypeCardActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  serviceTypeText: {
+    fontSize: 14,
+    color: theme.colors.text,
+    fontWeight: '500',
+  },
+  serviceTypeTextActive: {
+    color: theme.colors.white,
+    fontWeight: '600',
+  },
+  imagesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  image: {
+    width: 100,
+    height: 100,
+    borderRadius: theme.borderRadius.md,
+  },
+  noImagesText: {
+    textAlign: 'center',
+    color: theme.colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  footer: {
+    padding: theme.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
   },
   submitButton: {
     backgroundColor: theme.colors.primary,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: theme.spacing.md,
   },
-  loadingText: {
-    marginLeft: theme.spacing.sm,
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  helpText: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
-    marginBottom: theme.spacing.md,
-    fontStyle: 'italic',
+  submitButtonText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
+

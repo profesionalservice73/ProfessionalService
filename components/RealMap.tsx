@@ -55,15 +55,7 @@ export const RealMap: React.FC<RealMapProps> = ({
 
   return (
     <View style={[styles.container, mapSize]}>
-      <MapView style={styles.map} region={region}>
-        {/* Marcador principal de la ubicación */}
-        <Marker
-          coordinate={coordinates}
-          title={locationText}
-          description="Ubicación del servicio"
-          pinColor="#ff4444"
-        />
-      </MapView>
+      <MapView style={styles.map}/>
     </View>
   );
 };
@@ -78,6 +70,7 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.sm,
   },
   map: {
-    flex: 1,
+    width: "100%",
+    height: "100%"
   },
 });

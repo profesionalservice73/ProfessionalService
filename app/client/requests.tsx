@@ -99,10 +99,6 @@ const RequestCard = ({
             <Ionicons name="location-outline" size={16} color={theme.colors.textSecondary} />
             <Text style={styles.detailText}>{request.location}</Text>
           </View>
-          <View style={styles.detailItem}>
-            <Ionicons name="cash-outline" size={16} color={theme.colors.textSecondary} />
-            <Text style={styles.detailText}>{request.budget}</Text>
-          </View>
         </View>
       </TouchableOpacity>
       

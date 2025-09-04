@@ -7,10 +7,11 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import { theme } from "../../config/theme";
-import { LocationMap } from "../../components/LocationMap";
 import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
@@ -18,6 +19,9 @@ const { width } = Dimensions.get("window");
 export default function RequestDetailScreen() {
   const navigation = useNavigation();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
 
   // Datos de ejemplo de la solicitud
   const request = {
@@ -43,7 +47,6 @@ export default function RequestDetailScreen() {
         "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=100",
     },
     createdAt: "2024-01-15T10:30:00Z",
-    budget: "$50,000 - $100,000",
     urgency: "Urgente",
   };
 
@@ -61,6 +64,81 @@ export default function RequestDetailScreen() {
   const prevImage = () => {
     setCurrentImageIndex((prev) =>
       prev === 0 ? request.images.length - 1 : prev - 1
+    );
+  };
+
+  const handleMapReady = () => {
+    console.log("Mapa cargado exitosamente");
+    setMapReady(true);
+    setMapError(false);
+  };
+
+  const retryMap = () => {
+    setMapError(false);
+    setMapKey(prev => prev + 1);
+  };
+
+  const renderMap = () => {
+    if (mapError) {
+      return (
+        <View style={styles.mapFallback}>
+          <Ionicons name="map-outline" size={48} color={theme.colors.textSecondary} />
+          <Text style={styles.mapFallbackText}>Error al cargar el mapa</Text>
+          <Text style={styles.mapFallbackSubtext}>{request.location.address}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={retryMap}>
+            <Text style={styles.retryButtonText}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    // Configuración específica por plataforma
+    const mapProvider = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
+    
+    return (
+      <View style={styles.mapContainer}>
+        <MapView
+          key={mapKey}
+          style={styles.map}
+          provider={mapProvider}
+          initialRegion={{
+            latitude: request.location.latitude,
+            longitude: request.location.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }}
+          onMapReady={handleMapReady}
+          showsUserLocation={false}
+          showsMyLocationButton={false}
+          showsCompass={true}
+          showsScale={true}
+          loadingEnabled={true}
+          loadingIndicatorColor={theme.colors.primary}
+          loadingBackgroundColor={theme.colors.background}
+          mapType="standard"
+          zoomEnabled={true}
+          scrollEnabled={true}
+          rotateEnabled={false}
+          pitchEnabled={false}
+          toolbarEnabled={false}
+          liteMode={false}
+        >
+          <Marker
+            coordinate={{
+              latitude: request.location.latitude,
+              longitude: request.location.longitude,
+            }}
+            title="Ubicación del servicio"
+            description={request.location.address}
+            pinColor={theme.colors.primary}
+          />
+        </MapView>
+        {!mapReady && !mapError && (
+          <View style={styles.mapLoading}>
+            <Text style={styles.mapLoadingText}>Cargando mapa...</Text>
+          </View>
+        )}
+      </View>
     );
   };
 
@@ -138,14 +216,6 @@ export default function RequestDetailScreen() {
               <Text style={styles.detailText}>Publicado hace 2 horas</Text>
             </View>
             <View style={styles.detailItem}>
-              <Ionicons
-                name="cash-outline"
-                size={16}
-                color={theme.colors.textSecondary}
-              />
-              <Text style={styles.detailText}>{request.budget}</Text>
-            </View>
-            <View style={styles.detailItem}>
               <Ionicons name="alert-circle-outline" size={16} color="#FF6B6B" />
               <Text style={[styles.detailText, styles.urgentText]}>
                 {request.urgency}
@@ -156,7 +226,8 @@ export default function RequestDetailScreen() {
           {/* Mapa */}
           <View style={styles.mapSection}>
             <Text style={styles.sectionTitle}>Ubicación</Text>
-            <LocationMap location={request.location} size="full" />
+            {renderMap()}
+            <Text style={styles.addressText}>{request.location.address}</Text>
           </View>
         </View>
       </ScrollView>
@@ -296,6 +367,76 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
+  },
+  mapContainer: {
+    height: 300,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: "hidden",
+    marginBottom: theme.spacing.sm,
+    backgroundColor: theme.colors.background,
+    position: "relative",
+  },
+  map: {
+    width: "100%",
+    height: "100%",
+  },
+  mapFallback: {
+    height: 300,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+  },
+  mapFallbackText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
+    textAlign: "center",
+  },
+  mapFallbackSubtext: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  retryButton: {
+    marginTop: theme.spacing.md,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+  },
+  retryButtonText: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  mapLoading: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+  },
+  mapLoadingText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    fontWeight: "600",
+  },
+  addressText: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    fontStyle: "italic",
   },
   chatButton: {
     position: "absolute",

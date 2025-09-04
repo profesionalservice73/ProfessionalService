@@ -11,8 +11,12 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { Button } from '../../components/Button';
 import { theme } from '../../config/theme';
 import { Header } from '../../components/Header';
@@ -29,6 +33,9 @@ export default function ProfessionalDetailScreen({ route, navigation }: any) {
   const [professional, setProfessional] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string>('');
+  const [selectedImageTitle, setSelectedImageTitle] = useState<string>('');
 
   useEffect(() => {
     loadProfessionalData();
@@ -114,6 +121,133 @@ export default function ProfessionalDetailScreen({ route, navigation }: any) {
     return stars;
   };
 
+  // Función para obtener el icono del archivo
+  const getFileIcon = (documentUri: string | null): string => {
+    if (!documentUri) return 'document-outline';
+    
+    const fileExtension = documentUri.split('.').pop()?.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '')) {
+      return 'image';
+    } else if (fileExtension === 'pdf') {
+      return 'document';
+    } else if (['doc', 'docx'].includes(fileExtension || '')) {
+      return 'document-text';
+    } else if (['txt', 'rtf'].includes(fileExtension || '')) {
+      return 'document-text-outline';
+    } else {
+      return 'document-outline';
+    }
+  };
+
+  // Función para obtener el texto de acción del archivo
+  const getFileActionText = (documentUri: string | null): string => {
+    if (!documentUri) return 'Ver documento';
+    
+    const fileExtension = documentUri.split('.').pop()?.toLowerCase();
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '')) {
+      return 'Ver imagen';
+    } else if (fileExtension === 'pdf') {
+      return 'Ver PDF';
+    } else if (['doc', 'docx'].includes(fileExtension || '')) {
+      return 'Ver Word';
+    } else if (['txt', 'rtf'].includes(fileExtension || '')) {
+      return 'Ver texto';
+    } else {
+      return 'Ver archivo';
+    }
+  };
+
+  // Función para abrir documentos de certificación
+  const handleOpenCertificationDocument = async (documentUri: string, certificationName: string) => {
+    try {
+      console.log('🔍 Abriendo documento:', documentUri);
+      console.log('🔍 Tipo de archivo:', documentUri.split('.').pop()?.toLowerCase());
+      
+      // Determinar el tipo de archivo
+      const fileExtension = documentUri.split('.').pop()?.toLowerCase();
+      const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension || '');
+      const isPDF = fileExtension === 'pdf';
+      const isDocument = ['doc', 'docx', 'txt', 'rtf'].includes(fileExtension || '');
+      
+      if (isImage) {
+        // Para imágenes, abrir directamente en el modal
+        try {
+          // Para archivos locales, verificar si existen
+          if (documentUri.startsWith('file://')) {
+            const fileInfo = await FileSystem.getInfoAsync(documentUri);
+            if (!fileInfo.exists) {
+              throw new Error('Archivo no encontrado');
+            }
+          }
+          
+          setSelectedImage(documentUri);
+          setSelectedImageTitle(certificationName);
+          setImageModalVisible(true);
+        } catch (error) {
+          console.error('Error abriendo imagen:', error);
+          Alert.alert('Error', 'No se pudo abrir la imagen. Puede que el archivo no esté disponible.');
+        }
+      } else if (isPDF || isDocument) {
+        // Para PDFs y documentos, intentar descargar y compartir
+        if (documentUri.startsWith('http')) {
+          Alert.alert(
+            'Descargar Documento',
+            `¿Quieres descargar "${certificationName}"?`,
+            [
+              {
+                text: 'Cancelar',
+                style: 'cancel'
+              },
+              {
+                text: 'Descargar',
+                onPress: async () => {
+                  try {
+                    const fileName = `${certificationName.replace(/\s+/g, '_')}.${fileExtension}`;
+                    const downloadResumable = FileSystem.createDownloadResumable(
+                      documentUri,
+                      FileSystem.documentDirectory + fileName
+                    );
+                    
+                    const result = await downloadResumable.downloadAsync();
+                    if (result && result.uri) {
+                      console.log('🔍 Documento descargado:', result.uri);
+                      
+                      if (await Sharing.isAvailableAsync()) {
+                        await Sharing.shareAsync(result.uri, {
+                          mimeType: isPDF ? 'application/pdf' : 'application/octet-stream',
+                          dialogTitle: `Compartir ${certificationName}`
+                        });
+                      } else {
+                        Alert.alert('Información', 'Documento descargado exitosamente');
+                      }
+                    } else {
+                      throw new Error('No se pudo descargar el documento');
+                    }
+                  } catch (error) {
+                    console.error('Error descargando documento:', error);
+                    Alert.alert('Error', 'No se pudo descargar el documento');
+                  }
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Información', 'Este documento está almacenado localmente en el dispositivo del profesional');
+        }
+      } else {
+        // Para otros tipos de archivo
+        Alert.alert(
+          'Tipo de Archivo',
+          `Archivo: ${certificationName}\nTipo: ${fileExtension || 'Desconocido'}\n\nEste tipo de archivo no puede ser abierto directamente.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Error manejando documento:', error);
+      Alert.alert('Error', 'No se pudo abrir el documento');
+    }
+  };
+
   const handleContact = () => {
     if (!professional.phone) {
       Alert.alert(
@@ -125,7 +259,10 @@ export default function ProfessionalDetailScreen({ route, navigation }: any) {
     }
 
     // Crear mensaje predefinido
-    const message = `Hola ${professional.name}, vi tu perfil en Professional Service y me interesa contratar tus servicios de ${professional.specialty}. ¿Podrías darme más información sobre tus servicios y disponibilidad?`;
+    const specialtiesText = professional.specialties && professional.specialties.length > 0 
+      ? professional.specialties.join(', ') 
+      : 'tu especialidad';
+    const message = `Hola ${professional.name}, vi tu perfil en Professional Service y me interesa contratar tus servicios de ${specialtiesText}. ¿Podrías darme más información sobre tus servicios y disponibilidad?`;
     
     // Crear URL de WhatsApp
     const whatsappUrl = createWhatsAppUrl(professional.phone, message);
@@ -244,7 +381,21 @@ export default function ProfessionalDetailScreen({ route, navigation }: any) {
           </View>
           
           <Text style={styles.professionalName}>{professional.name}</Text>
-          <Text style={styles.professionalSpecialty}>{professional.specialty}</Text>
+          <Text style={styles.professionalSpecialty}>
+            {professional.specialties && professional.specialties.length > 0 
+              ? professional.specialties.join(' • ') 
+              : 'Especialidad no especificada'}
+          </Text>
+          
+          {/* Resumen de certificaciones */}
+          {professional.certifications && professional.certifications.length > 0 && (
+            <View style={styles.certificationsSummary}>
+              <Ionicons name="ribbon" size={16} color={theme.colors.success} />
+              <Text style={styles.certificationsSummaryText}>
+                {professional.certifications.length} certificación{professional.certifications.length > 1 ? 'es' : ''} verificada{professional.certifications.length > 1 ? 's' : ''}
+              </Text>
+            </View>
+          )}
           
           <View style={styles.ratingContainer}>
             <View style={styles.starsContainer}>
@@ -290,6 +441,19 @@ export default function ProfessionalDetailScreen({ route, navigation }: any) {
             <Text style={styles.sectionTitle}>Descripción</Text>
             <Text style={styles.description}>{professional.description || 'Sin descripción disponible'}</Text>
             
+            <Text style={styles.sectionTitle}>Especialidades</Text>
+            {professional.specialties && professional.specialties.length > 0 ? (
+              <View style={styles.specialtiesContainer}>
+                {professional.specialties.map((specialty: string, index: number) => (
+                  <View key={index} style={styles.specialtyTag}>
+                    <Text style={styles.specialtyText}>{specialty}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.description}>Sin especialidades registradas</Text>
+            )}
+            
             <Text style={styles.sectionTitle}>Ubicación</Text>
             <Text style={styles.description}>{professional.location || 'Ubicación no especificada'}</Text>
             
@@ -298,12 +462,46 @@ export default function ProfessionalDetailScreen({ route, navigation }: any) {
             
             <Text style={styles.sectionTitle}>Certificaciones</Text>
             {professional.certifications && professional.certifications.length > 0 ? (
-              professional.certifications.map((cert: string, index: number) => (
-                <View key={index} style={styles.certificationItem}>
-                  <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
-                  <Text style={styles.certificationText}>{cert}</Text>
-                </View>
-              ))
+              professional.certifications.map((cert: string, index: number) => {
+                const hasDocument = professional.certificationDocuments && 
+                  professional.certificationDocuments[index] && 
+                  professional.certificationDocuments[index] !== null;
+                
+                return (
+                  <View key={index} style={styles.certificationItem}>
+                    <View style={styles.certificationHeader}>
+                      <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} />
+                      <Text style={styles.certificationText}>{cert}</Text>
+                    </View>
+                    
+                    {hasDocument && (
+                      <TouchableOpacity 
+                        style={styles.certificationDocument}
+                        onPress={() => {
+                          if (professional.certificationDocuments[index]) {
+                            handleOpenCertificationDocument(
+                              professional.certificationDocuments[index]!,
+                              cert
+                            );
+                          }
+                        }}
+                      >
+                        <View style={styles.documentIconContainer}>
+                          <Ionicons 
+                            name={getFileIcon(professional.certificationDocuments[index]) as any} 
+                            size={16} 
+                            color={theme.colors.primary} 
+                          />
+                        </View>
+                        <Text style={styles.certificationDocumentText}>
+                          {getFileActionText(professional.certificationDocuments[index])}
+                        </Text>
+                        <Ionicons name="open-outline" size={14} color={theme.colors.primary} style={{ marginLeft: theme.spacing.xs }} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              })
             ) : (
               <Text style={styles.description}>Sin certificaciones registradas</Text>
             )}
@@ -370,6 +568,59 @@ export default function ProfessionalDetailScreen({ route, navigation }: any) {
           style={styles.contactButton}
         />
       </View>
+
+      {/* Modal para mostrar imágenes */}
+      <Modal
+        visible={imageModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setImageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedImageTitle}</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setImageModalVisible(false)}
+              >
+                <Ionicons name="close" size={24} color={theme.colors.white} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.imageContainer}>
+              <ScrollView 
+                contentContainerStyle={styles.scrollContainer}
+                showsVerticalScrollIndicator={true}
+                showsHorizontalScrollIndicator={true}
+              >
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={styles.modalImage}
+                  resizeMode="contain"
+                  onLoadStart={() => console.log('🔍 Cargando imagen...')}
+                  onLoad={(event) => {
+                    console.log('🔍 Imagen cargada exitosamente');
+                    console.log('🔍 Dimensiones de la imagen:', event.nativeEvent);
+                    
+                    // Ajustar el tamaño de la imagen según sus dimensiones reales
+                    const { width: imageWidth, height: imageHeight } = event.nativeEvent as any;
+                    if (imageWidth && imageHeight) {
+                      console.log('🔍 Proporción de la imagen:', imageWidth / imageHeight);
+                    }
+                  }}
+                  onError={(error) => {
+                    console.error('🔍 Error cargando imagen:', error);
+                    Alert.alert('Error', 'No se pudo cargar la imagen');
+                  }}
+                />
+              </ScrollView>
+            </View>
+            
+
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -493,13 +744,19 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   certificationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: theme.colors.success,
   },
   certificationText: {
-    fontSize: 14,
+    fontSize: 16,
     color: theme.colors.text,
+    fontWeight: '500',
     marginLeft: theme.spacing.sm,
   },
   availabilityText: {
@@ -562,6 +819,133 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.md,
     fontSize: 16,
     color: theme.colors.textSecondary,
+  },
+  // Estilos para especialidades
+  specialtiesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+    marginBottom: theme.spacing.md,
+  },
+  specialtyTag: {
+    backgroundColor: theme.colors.primary + '20',
+    borderRadius: theme.borderRadius.full,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  specialtyText: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    fontWeight: '500',
+  },
+  // Estilos para certificaciones mejoradas
+  certificationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  certificationDocument: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.primary + '10',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    marginTop: theme.spacing.xs,
+    marginLeft: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.primary + '30',
+  },
+  certificationDocumentText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    marginLeft: theme.spacing.xs,
+    fontStyle: 'italic',
+  },
+  // Estilos para resumen de certificaciones
+  certificationsSummary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.success + '20',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.full,
+    marginTop: theme.spacing.sm,
+    alignSelf: 'center',
+  },
+  certificationsSummaryText: {
+    fontSize: 14,
+    color: theme.colors.success,
+    fontWeight: '500',
+    marginLeft: theme.spacing.xs,
+  },
+  // Estilos para iconos de documentos
+  documentIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Estilos para el modal de imagen
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.lg,
+    width: Dimensions.get('window').width * 0.95,
+    height: Dimensions.get('window').height * 0.9,
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: theme.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+    backgroundColor: theme.colors.primary,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.white,
+    flex: 1,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.md,
+    minHeight: 500,
+  },
+  modalImage: {
+    width: Dimensions.get('window').width * 0.85,
+    height: undefined,
+    aspectRatio: 0.7, // Proporción más alta para certificados (más alto que ancho)
+    borderRadius: theme.borderRadius.md,
+    maxHeight: Dimensions.get('window').height * 0.7,
+  },
+
+  // Estilos para el scroll de la imagen
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: theme.spacing.md,
   },
 });
 

@@ -13,7 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ProfessionalCard } from '../../components/ProfessionalCard';
 import { theme } from '../../config/theme';
 import { Header } from '../../components/Header';
-import { searchAPI } from '../../services/api';
+import { searchAPI, clientAPI } from '../../services/api';
 
 // Categorías estáticas
 const categories = {
@@ -105,9 +105,11 @@ export default function CategoryDetailScreen({ route, navigation }: any) {
   const loadProfessionals = async () => {
     try {
       setLoading(true);
-      const response = await searchAPI.searchProfessionals({ specialty: categoryId });
+      console.log('🔍 Buscando profesionales para categoría:', categoryId);
+      const response = await clientAPI.getProfessionalsByCategory(categoryId);
       
       if (response.success) {
+        console.log('🔍 Profesionales encontrados:', response.data?.length || 0);
         setProfessionals(response.data || []);
       } else {
         console.log('Error cargando profesionales:', response.error);

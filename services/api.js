@@ -3,6 +3,7 @@ import { Alert } from "react-native";
 // Configuración de la API - IMPORTANTE: Cambiar por tu IP local
 // const API_BASE_URL = // 'http://192.168.0.94:3000/api/v1'
 const API_BASE_URL = "http://192.168.0.94:3000/api/v1"; // 'https://api-professional-service.vercel.app/api/v1';
+// "http://192.168.0.94:3000/api/v1";
 
 // Clase para manejar las respuestas de la API
 class ApiResponse {
@@ -73,6 +74,22 @@ export const authAPI = {
     return await apiRequest("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    });
+  },
+
+  // Enviar código OTP
+  sendOTP: async (type, contact, purpose) => {
+    return await apiRequest("/auth/send-otp", {
+      method: "POST",
+      body: JSON.stringify({ type, contact, purpose }),
+    });
+  },
+
+  // Verificar código OTP
+  verifyOTP: async (type, contact, code, purpose) => {
+    return await apiRequest("/auth/verify-otp", {
+      method: "POST",
+      body: JSON.stringify({ type, contact, code, purpose }),
     });
   },
 };
@@ -333,7 +350,7 @@ clientAPI.searchProfessionals = async (searchQuery) => {
 };
 
 clientAPI.searchProfessionalsByCategory = async (categoryId) => {
-  return await apiRequest(`/search/professionals?categoryId=${categoryId}`);
+  return await apiRequest(`/search/professionals?category=${categoryId}`);
 };
 
 // ===== RESEÑAS =====
