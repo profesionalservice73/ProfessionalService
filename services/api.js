@@ -1,7 +1,7 @@
 import { Alert } from "react-native";
 
 // Configuración de la API - IMPORTANTE: Cambiar por tu IP local
-const API_BASE_URL = "http://192.168.0.94:3000/api/v1"; // 'https://api-professional-service.vercel.app/api/v1';
+const API_BASE_URL = "http://192.168.0.78:3000/api/v1"; // 'https://api-professional-service.vercel.app/api/v1';
 
 // Clase para manejar las respuestas de la API
 class ApiResponse {
@@ -386,29 +386,92 @@ export const reviewsAPI = {
 
 export const documentAPI = {
   /**
-   * Valida un documento DNI usando OCR en el backend (NUEVO)
+   * Valida el frente del DNI usando OCR (NUEVO)
+   * @param {File} imageFile - Archivo de imagen del frente
+   * @returns {Promise<Object>} Resultado de la validación
+   */
+  validateDNIFront: async (imageFile) => {
+    const formData = new FormData();
+    formData.append("dniFront", imageFile);
+
+    return await fetch(`${API_BASE_URL}/validate-dni-front`, {
+      method: "POST",
+      body: formData,
+    }).then((res) => res.json());
+  },
+
+  /**
+   * Valida el dorso del DNI usando OCR (NUEVO)
+   * @param {File} imageFile - Archivo de imagen del dorso
+   * @returns {Promise<Object>} Resultado de la validación
+   */
+  validateDNIBack: async (imageFile) => {
+    const formData = new FormData();
+    formData.append("dniBack", imageFile);
+
+    return await fetch(`${API_BASE_URL}/validate-dni-back`, {
+      method: "POST",
+      body: formData,
+    }).then((res) => res.json());
+  },
+
+  /**
+   * Valida DNI combinado (frente + dorso)
+   * @param {Object} frontData - Datos del frente
+   * @param {Object} backData - Datos del dorso
+   * @returns {Promise<Object>} Resultado de la validación
+   */
+  validateDNICombined: async (frontData, backData) => {
+    return await apiRequest("/validate-dni", {
+      method: "POST",
+      body: JSON.stringify({ front: frontData, back: backData }),
+    });
+  },
+
+  /**
+   * Valida un documento DNI usando base64 (COMPATIBILIDAD)
    * @param {string} imageBase64 - Imagen en base64
    * @param {string} type - 'front' o 'back'
    * @returns {Promise<Object>} Resultado de la validación
    */
   validateDNI: async (imageBase64, type) => {
-    return await apiRequest("/validate-dni-base64", {
-      method: "POST",
-      body: JSON.stringify({ imageBase64, type }),
-    });
-  },
+    try {
+      // Crear FormData con la imagen en base64
+      const formData = new FormData();
 
-  /**
-   * Valida un documento DNI usando Gemini AI en el backend (LEGACY)
-   * @param {string} imageBase64 - Imagen en base64
-   * @param {string} type - 'front' o 'back'
-   * @returns {Promise<Object>} Resultado de la validación
-   */
-  validateDocument: async (imageBase64, type) => {
-    return await apiRequest("/validate-document", {
-      method: "POST",
-      body: JSON.stringify({ imageBase64, type }),
-    });
+      // Crear objeto de archivo compatible con React Native
+      const imageData = {
+        uri: `data:image/jpeg;base64,${imageBase64}`,
+        type: "image/jpeg",
+        name: "dni.jpg",
+      };
+
+      // Agregar al FormData según el tipo
+      if (type === "front") {
+        formData.append("dniFront", imageData);
+      } else {
+        formData.append("dniBack", imageData);
+      }
+
+      // Llamar al endpoint correspondiente
+      const endpoint =
+        type === "front" ? "/validate-dni-front" : "/validate-dni-back";
+
+      return await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }).then((res) => res.json());
+    } catch (error) {
+      console.error("[documentAPI] Error en validateDNI:", error);
+      return {
+        valid: false,
+        message: "Error al procesar la imagen",
+        error: error.message,
+      };
+    }
   },
 
   /**

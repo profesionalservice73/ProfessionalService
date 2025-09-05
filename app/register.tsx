@@ -90,9 +90,9 @@ export default function RegisterScreen({ navigation }: any) {
     profilePhoto: null as string | null,
   });
   const [verificationStatus, setVerificationStatus] = useState({
-    dniFront: 'pending' as 'pending' | 'verifying' | 'verified' | 'failed',
-    dniBack: 'pending' as 'pending' | 'verifying' | 'verified' | 'failed',
-    profilePhoto: 'pending' as 'pending' | 'verifying' | 'verified' | 'failed',
+    dniFront: "pending" as "pending" | "verifying" | "verified" | "failed",
+    dniBack: "pending" as "pending" | "verifying" | "verified" | "failed",
+    profilePhoto: "pending" as "pending" | "verifying" | "verified" | "failed",
   });
 
   // Estados para el formulario de cliente
@@ -205,23 +205,28 @@ export default function RegisterScreen({ navigation }: any) {
     setProfessionalFormData((prev) => ({
       ...prev,
       specialties: prev.specialties.includes(specialtyId)
-        ? prev.specialties.filter(id => id !== specialtyId)
-        : [...prev.specialties, specialtyId]
+        ? prev.specialties.filter((id) => id !== specialtyId)
+        : [...prev.specialties, specialtyId],
     }));
   };
 
   const handleRemoveSpecialty = (specialtyId: string) => {
     setProfessionalFormData((prev) => ({
       ...prev,
-      specialties: prev.specialties.filter(id => id !== specialtyId)
+      specialties: prev.specialties.filter((id) => id !== specialtyId),
     }));
   };
 
   // Funciones para manejo de imágenes y documentos
-  const takeDocumentPhoto = async (field: 'dniImage' | 'professionalLicense' | 'insuranceCertificate') => {
+  const takeDocumentPhoto = async (
+    field: "dniImage" | "professionalLicense" | "insuranceCertificate"
+  ) => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permisos', 'Se necesitan permisos de cámara para tomar la foto');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permisos",
+        "Se necesitan permisos de cámara para tomar la foto"
+      );
       return;
     }
 
@@ -233,17 +238,22 @@ export default function RegisterScreen({ navigation }: any) {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setProfessionalFormData(prev => ({
+      setProfessionalFormData((prev) => ({
         ...prev,
-        [field]: result.assets[0].uri
+        [field]: result.assets[0].uri,
       }));
     }
   };
 
-  const selectDocumentImage = async (field: 'dniImage' | 'professionalLicense' | 'insuranceCertificate') => {
+  const selectDocumentImage = async (
+    field: "dniImage" | "professionalLicense" | "insuranceCertificate"
+  ) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permisos', 'Se necesitan permisos de galería para seleccionar la imagen');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permisos",
+        "Se necesitan permisos de galería para seleccionar la imagen"
+      );
       return;
     }
 
@@ -255,20 +265,25 @@ export default function RegisterScreen({ navigation }: any) {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setProfessionalFormData(prev => ({
+      setProfessionalFormData((prev) => ({
         ...prev,
-        [field]: result.assets[0].uri
+        [field]: result.assets[0].uri,
       }));
     }
   };
 
   // Funciones para verificación inicial
-  const takeVerificationPhoto = async (field: 'dniFront' | 'dniBack' | 'profilePhoto') => {
-    console.log('🔍 takeVerificationPhoto llamado con field:', field);
-    
+  const takeVerificationPhoto = async (
+    field: "dniFront" | "dniBack" | "profilePhoto"
+  ) => {
+    console.log("🔍 takeVerificationPhoto llamado con field:", field);
+
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permisos', 'Se necesitan permisos de cámara para tomar la foto');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permisos",
+        "Se necesitan permisos de cámara para tomar la foto"
+      );
       return;
     }
 
@@ -281,48 +296,63 @@ export default function RegisterScreen({ navigation }: any) {
 
     if (!result.canceled && result.assets[0]) {
       const imageUri = result.assets[0].uri;
-      
+
       // Validar la imagen INMEDIATAMENTE según el tipo
       let validationResult;
-      if (field === 'profilePhoto') {
-        validationResult = await ImageValidationService.validateProfileImage(imageUri);
+      if (field === "profilePhoto") {
+        validationResult = await ImageValidationService.validateProfileImage(
+          imageUri
+        );
       } else {
         // Para DNI front y back
-        validationResult = await ImageValidationService.validateDNIImage(imageUri);
+        validationResult = await ImageValidationService.validateDNIImage(
+          imageUri
+        );
       }
 
       // Mostrar resultado de validación INMEDIATO
-      const isValid = ImageValidationService.showValidationAlert(validationResult, field === 'profilePhoto' ? 'profile' : 'dni');
-      
+      const isValid = ImageValidationService.showValidationAlert(
+        validationResult,
+        field === "profilePhoto" ? "profile" : "dni"
+      );
+
       if (isValid) {
         // Solo guardar la imagen si es válida
-        setVerificationData(prev => ({
+        setVerificationData((prev) => ({
           ...prev,
-          [field]: imageUri
+          [field]: imageUri,
         }));
-        
+
         // Marcar como verificada inmediatamente
-        setVerificationStatus(prev => ({ ...prev, [field]: 'verified' }));
-        
-        console.log(`✅ Foto ${field} validada y guardada INMEDIATAMENTE:`, imageUri);
+        setVerificationStatus((prev) => ({ ...prev, [field]: "verified" }));
+
+        console.log(
+          `✅ Foto ${field} validada y guardada INMEDIATAMENTE:`,
+          imageUri
+        );
       } else {
         // Foto rechazada - NO se guarda nada
         console.log(`❌ Foto ${field} rechazada por validación INMEDIATA`);
         Alert.alert(
-          'Foto Rechazada',
-          'La foto no cumple con los requisitos. Por favor, toma otra foto que cumpla con las especificaciones.',
-          [{ text: 'Entendido' }]
+          "Foto Rechazada",
+          "La foto no cumple con los requisitos. Por favor, toma otra foto que cumpla con las especificaciones.",
+          [{ text: "Entendido" }]
         );
       }
     }
   };
 
-  const selectVerificationImage = async (field: 'dniFront' | 'dniBack' | 'profilePhoto') => {
-    console.log('🔍 selectVerificationImage llamado con field:', field);
-    
+  const selectVerificationImage = async (
+    field: "dniFront" | "dniBack" | "profilePhoto"
+  ) => {
+    console.log("🔍 selectVerificationImage llamado con field:", field);
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permisos', 'Se necesitan permisos de galería para seleccionar la imagen');
+    if (status !== "granted") {
+      Alert.alert(
+        "Permisos",
+        "Se necesitan permisos de galería para seleccionar la imagen"
+      );
       return;
     }
 
@@ -335,37 +365,47 @@ export default function RegisterScreen({ navigation }: any) {
 
     if (!result.canceled && result.assets[0]) {
       const imageUri = result.assets[0].uri;
-      
+
       // Validar la imagen INMEDIATAMENTE según el tipo
       let validationResult;
-      if (field === 'profilePhoto') {
-        validationResult = await ImageValidationService.validateProfileImage(imageUri);
+      if (field === "profilePhoto") {
+        validationResult = await ImageValidationService.validateProfileImage(
+          imageUri
+        );
       } else {
         // Para DNI front y back
-        validationResult = await ImageValidationService.validateDNIImage(imageUri);
+        validationResult = await ImageValidationService.validateDNIImage(
+          imageUri
+        );
       }
 
       // Mostrar resultado de validación INMEDIATO
-      const isValid = ImageValidationService.showValidationAlert(validationResult, field === 'profilePhoto' ? 'profile' : 'dni');
-      
+      const isValid = ImageValidationService.showValidationAlert(
+        validationResult,
+        field === "profilePhoto" ? "profile" : "dni"
+      );
+
       if (isValid) {
         // Solo guardar la imagen si es válida
-        setVerificationData(prev => ({
+        setVerificationData((prev) => ({
           ...prev,
-          [field]: imageUri
+          [field]: imageUri,
         }));
-        
+
         // Marcar como verificada inmediatamente
-        setVerificationStatus(prev => ({ ...prev, [field]: 'verified' }));
-        
-        console.log(`✅ Imagen ${field} validada y guardada INMEDIATAMENTE:`, imageUri);
+        setVerificationStatus((prev) => ({ ...prev, [field]: "verified" }));
+
+        console.log(
+          `✅ Imagen ${field} validada y guardada INMEDIATAMENTE:`,
+          imageUri
+        );
       } else {
         // Imagen rechazada - NO se guarda nada
         console.log(`❌ Imagen ${field} rechazada por validación INMEDIATA`);
         Alert.alert(
-          'Imagen Rechazada',
-          'La imagen no cumple con los requisitos. Por favor, selecciona otra imagen que cumpla con las especificaciones.',
-          [{ text: 'Entendido' }]
+          "Imagen Rechazada",
+          "La imagen no cumple con los requisitos. Por favor, selecciona otra imagen que cumpla con las especificaciones.",
+          [{ text: "Entendido" }]
         );
       }
     }
@@ -376,22 +416,24 @@ export default function RegisterScreen({ navigation }: any) {
       setVerificationStep(verificationStep + 1);
     } else {
       // Verificar que todos los documentos estén verificados
-      const allVerified = Object.values(verificationStatus).every(status => status === 'verified');
-      
+      const allVerified = Object.values(verificationStatus).every(
+        (status) => status === "verified"
+      );
+
       if (allVerified) {
         setVerificationComplete(true);
         setShowVerificationModal(false);
         // Transferir la foto de perfil al formulario
-        setProfessionalFormData(prev => ({
+        setProfessionalFormData((prev) => ({
           ...prev,
-          profilePhoto: verificationData.profilePhoto
+          profilePhoto: verificationData.profilePhoto,
         }));
         // Resetear el paso de verificación para futuros usos
         setVerificationStep(1);
       } else {
         Alert.alert(
-          'Verificación Pendiente',
-          'Todos los documentos deben estar verificados antes de continuar.'
+          "Verificación Pendiente",
+          "Todos los documentos deben estar verificados antes de continuar."
         );
       }
     }
@@ -414,11 +456,11 @@ export default function RegisterScreen({ navigation }: any) {
     setProfessionalFormData((prev) => ({
       ...prev,
       certifications: prev.certifications.filter((_, i) => i !== index),
-      certificationDocuments: prev.certificationDocuments.filter((_, i) => i !== index),
+      certificationDocuments: prev.certificationDocuments.filter(
+        (_, i) => i !== index
+      ),
     }));
   };
-
-
 
   const handleRemoveLanguage = (index: number) => {
     setProfessionalFormData((prev) => ({
@@ -431,7 +473,7 @@ export default function RegisterScreen({ navigation }: any) {
   const handleRemoveCertificationDocument = (index: number) => {
     setProfessionalFormData((prev) => ({
       ...prev,
-      certificationDocuments: prev.certificationDocuments.map((doc, i) => 
+      certificationDocuments: prev.certificationDocuments.map((doc, i) =>
         i === index ? null : doc
       ),
     }));
@@ -449,7 +491,7 @@ export default function RegisterScreen({ navigation }: any) {
       if (!result.canceled && result.assets[0]) {
         setProfessionalFormData((prev) => ({
           ...prev,
-          certificationDocuments: prev.certificationDocuments.map((doc, i) => 
+          certificationDocuments: prev.certificationDocuments.map((doc, i) =>
             i === index ? result.assets[0].uri : doc
           ),
         }));
@@ -471,7 +513,7 @@ export default function RegisterScreen({ navigation }: any) {
       if (!result.canceled && result.assets[0]) {
         setProfessionalFormData((prev) => ({
           ...prev,
-          certificationDocuments: prev.certificationDocuments.map((doc, i) => 
+          certificationDocuments: prev.certificationDocuments.map((doc, i) =>
             i === index ? result.assets[0].uri : doc
           ),
         }));
@@ -485,12 +527,12 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: [
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'text/plain',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "text/plain",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         ],
         copyToCacheDirectory: true,
       });
@@ -498,7 +540,7 @@ export default function RegisterScreen({ navigation }: any) {
       if (!result.canceled && result.assets[0]) {
         setProfessionalFormData((prev) => ({
           ...prev,
-          certificationDocuments: prev.certificationDocuments.map((doc, i) => 
+          certificationDocuments: prev.certificationDocuments.map((doc, i) =>
             i === index ? result.assets[0].uri : doc
           ),
         }));
@@ -507,8 +549,6 @@ export default function RegisterScreen({ navigation }: any) {
       console.error("Error al seleccionar PDF/documento:", error);
     }
   };
-
-
 
   // Funciones para manejar imágenes
   const requestPermissions = async () => {
@@ -538,44 +578,69 @@ export default function RegisterScreen({ navigation }: any) {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const imageUri = result.assets[0].uri;
-        
+
         // Validar la imagen INMEDIATAMENTE según el tipo
         let validationResult;
         if (type === "profile") {
-          validationResult = await ImageValidationService.validateProfileImage(imageUri);
+          validationResult = await ImageValidationService.validateProfileImage(
+            imageUri
+          );
         } else {
           // Para DNI front y back
-          validationResult = await ImageValidationService.validateDNIImage(imageUri);
+          validationResult = await ImageValidationService.validateDNIImage(
+            imageUri
+          );
         }
 
         // Mostrar resultado de validación INMEDIATO
-        const isValid = ImageValidationService.showValidationAlert(validationResult, type === "profile" ? "profile" : "dni");
-        
+        const isValid = ImageValidationService.showValidationAlert(
+          validationResult,
+          type === "profile" ? "profile" : "dni"
+        );
+
         if (isValid) {
           // Solo guardar la imagen si es válida
           if (type === "profile") {
             setProfileImage(imageUri);
-            setVerificationData(prev => ({ ...prev, profilePhoto: imageUri }));
-            setVerificationStatus(prev => ({ ...prev, profilePhoto: 'verified' }));
-            console.log(`✅ Imagen ${type} validada y guardada INMEDIATAMENTE:`, imageUri);
+            setVerificationData((prev) => ({
+              ...prev,
+              profilePhoto: imageUri,
+            }));
+            setVerificationStatus((prev) => ({
+              ...prev,
+              profilePhoto: "verified",
+            }));
+            console.log(
+              `✅ Imagen ${type} validada y guardada INMEDIATAMENTE:`,
+              imageUri
+            );
           } else if (type === "dni_front") {
             setDniFrontImage(imageUri);
-            setVerificationData(prev => ({ ...prev, dniFront: imageUri }));
-            setVerificationStatus(prev => ({ ...prev, dniFront: 'verified' }));
-            console.log(`✅ DNI ${type} validado y guardado INMEDIATAMENTE:`, imageUri);
+            setVerificationData((prev) => ({ ...prev, dniFront: imageUri }));
+            setVerificationStatus((prev) => ({
+              ...prev,
+              dniFront: "verified",
+            }));
+            console.log(
+              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
+              imageUri
+            );
           } else if (type === "dni_back") {
             setDniBackImage(imageUri);
-            setVerificationData(prev => ({ ...prev, dniBack: imageUri }));
-            setVerificationStatus(prev => ({ ...prev, dniBack: 'verified' }));
-            console.log(`✅ DNI ${type} validado y guardado INMEDIATAMENTE:`, imageUri);
+            setVerificationData((prev) => ({ ...prev, dniBack: imageUri }));
+            setVerificationStatus((prev) => ({ ...prev, dniBack: "verified" }));
+            console.log(
+              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
+              imageUri
+            );
           }
         } else {
           // Imagen rechazada - NO se guarda nada
           console.log(`❌ Imagen ${type} rechazada por validación INMEDIATA`);
           Alert.alert(
-            'Imagen Rechazada',
-            'La imagen no cumple con los requisitos. Por favor, selecciona otra imagen que cumpla con las especificaciones.',
-            [{ text: 'Entendido' }]
+            "Imagen Rechazada",
+            "La imagen no cumple con los requisitos. Por favor, selecciona otra imagen que cumpla con las especificaciones.",
+            [{ text: "Entendido" }]
           );
         }
       }
@@ -605,44 +670,69 @@ export default function RegisterScreen({ navigation }: any) {
 
       if (!result.canceled && result.assets && result.assets[0]) {
         const imageUri = result.assets[0].uri;
-        
+
         // Validar la imagen INMEDIATAMENTE según el tipo
         let validationResult;
         if (type === "profile") {
-          validationResult = await ImageValidationService.validateProfileImage(imageUri);
+          validationResult = await ImageValidationService.validateProfileImage(
+            imageUri
+          );
         } else {
           // Para DNI front y back
-          validationResult = await ImageValidationService.validateDNIImage(imageUri);
+          validationResult = await ImageValidationService.validateDNIImage(
+            imageUri
+          );
         }
 
         // Mostrar resultado de validación INMEDIATO
-        const isValid = ImageValidationService.showValidationAlert(validationResult, type === "profile" ? "profile" : "dni");
-        
+        const isValid = ImageValidationService.showValidationAlert(
+          validationResult,
+          type === "profile" ? "profile" : "dni"
+        );
+
         if (isValid) {
           // Solo guardar la imagen si es válida
           if (type === "profile") {
             setProfileImage(imageUri);
-            setVerificationData(prev => ({ ...prev, profilePhoto: imageUri }));
-            setVerificationStatus(prev => ({ ...prev, profilePhoto: 'verified' }));
-            console.log(`✅ Foto ${type} validada y guardada INMEDIATAMENTE:`, imageUri);
+            setVerificationData((prev) => ({
+              ...prev,
+              profilePhoto: imageUri,
+            }));
+            setVerificationStatus((prev) => ({
+              ...prev,
+              profilePhoto: "verified",
+            }));
+            console.log(
+              `✅ Foto ${type} validada y guardada INMEDIATAMENTE:`,
+              imageUri
+            );
           } else if (type === "dni_front") {
             setDniFrontImage(imageUri);
-            setVerificationData(prev => ({ ...prev, dniFront: imageUri }));
-            setVerificationStatus(prev => ({ ...prev, dniFront: 'verified' }));
-            console.log(`✅ DNI ${type} validado y guardado INMEDIATAMENTE:`, imageUri);
+            setVerificationData((prev) => ({ ...prev, dniFront: imageUri }));
+            setVerificationStatus((prev) => ({
+              ...prev,
+              dniFront: "verified",
+            }));
+            console.log(
+              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
+              imageUri
+            );
           } else if (type === "dni_back") {
             setDniBackImage(imageUri);
-            setVerificationData(prev => ({ ...prev, dniBack: imageUri }));
-            setVerificationStatus(prev => ({ ...prev, dniBack: 'verified' }));
-            console.log(`✅ DNI ${type} validado y guardado INMEDIATAMENTE:`, imageUri);
+            setVerificationData((prev) => ({ ...prev, dniBack: imageUri }));
+            setVerificationStatus((prev) => ({ ...prev, dniBack: "verified" }));
+            console.log(
+              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
+              imageUri
+            );
           }
         } else {
           // Foto rechazada - NO se guarda nada
           console.log(`❌ Foto ${type} rechazada por validación INMEDIATA`);
           Alert.alert(
-            'Foto Rechazada',
-            'La foto no cumple con los requisitos. Por favor, toma otra foto que cumpla con las especificaciones.',
-            [{ text: 'Entendido' }]
+            "Foto Rechazada",
+            "La foto no cumple con los requisitos. Por favor, toma otra foto que cumpla con las especificaciones.",
+            [{ text: "Entendido" }]
           );
         }
       }
@@ -748,13 +838,14 @@ export default function RegisterScreen({ navigation }: any) {
         newErrors.certifications = "Agrega al menos una certificación";
       if (professionalFormData.languages.length === 0)
         newErrors.languages = "Agrega al menos un idioma";
-      
+
       // Validar que cada certificación tenga su documento
-      const missingDocuments = professionalFormData.certifications.filter((_, index) => 
-        !professionalFormData.certificationDocuments[index]
+      const missingDocuments = professionalFormData.certifications.filter(
+        (_, index) => !professionalFormData.certificationDocuments[index]
       );
       if (missingDocuments.length > 0) {
-        newErrors.certifications = "Cada certificación debe tener su documento correspondiente";
+        newErrors.certifications =
+          "Cada certificación debe tener su documento correspondiente";
       }
     }
 
@@ -815,13 +906,13 @@ export default function RegisterScreen({ navigation }: any) {
       setProfessionalLoading(true);
       try {
         // Log para debugging
-        console.log('Enviando datos del profesional:', {
+        console.log("Enviando datos del profesional:", {
           formData: professionalFormData,
-          verificationData: verificationData
+          verificationData: verificationData,
         });
-        
+
         // Log detallado de cada campo
-        console.log('Validación de campos antes del envío:', {
+        console.log("Validación de campos antes del envío:", {
           fullName: !!professionalFormData.fullName,
           email: !!professionalFormData.email,
           phone: !!professionalFormData.phone,
@@ -832,7 +923,7 @@ export default function RegisterScreen({ navigation }: any) {
           location: !!professionalFormData.location,
           profilePhoto: !!professionalFormData.profilePhoto,
           dniFront: !!verificationData.dniFront,
-          dniBack: !!verificationData.dniBack
+          dniBack: !!verificationData.dniBack,
         });
 
         // Registrar usuario y completar perfil profesional en una sola llamada
@@ -860,7 +951,7 @@ export default function RegisterScreen({ navigation }: any) {
           languages: professionalFormData.languages,
           // Datos del KYC
           kycData: kycData,
-          kycStatus: kycData?.reviewResult?.isApproved ? 'approved' : 'pending',
+          kycStatus: kycData?.reviewResult?.isApproved ? "approved" : "pending",
         });
 
         if (registerResult.success) {
@@ -898,7 +989,7 @@ export default function RegisterScreen({ navigation }: any) {
     setKycCompleted(true);
     setKycData(kycData);
     setShowKYCFlow(false);
-    
+
     if (isApproved) {
       Alert.alert(
         "KYC Aprobado",
@@ -1216,26 +1307,36 @@ export default function RegisterScreen({ navigation }: any) {
         {kycCompleted ? (
           <View style={styles.kycStatusContainer}>
             <View style={styles.kycStatusSuccess}>
-              <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={theme.colors.success}
+              />
               <Text style={styles.kycStatusText}>
-                {kycData?.reviewResult?.isApproved ? 'KYC Aprobado' : 'KYC En Revisión'}
+                {kycData?.reviewResult?.isApproved
+                  ? "KYC Aprobado"
+                  : "KYC En Revisión"}
               </Text>
             </View>
             <Text style={styles.kycStatusSubtext}>
-              {kycData?.reviewResult?.isApproved 
-                ? 'Tu identidad ha sido verificada exitosamente'
-                : 'Tu verificación está siendo revisada por un especialista'
-              }
+              {kycData?.reviewResult?.isApproved
+                ? "Tu identidad ha sido verificada exitosamente"
+                : "Tu verificación está siendo revisada por un especialista"}
             </Text>
           </View>
         ) : (
           <View style={styles.kycStatusContainer}>
             <View style={styles.kycStatusPending}>
-              <Ionicons name="information-circle" size={20} color={theme.colors.primary} />
+              <Ionicons
+                name="information-circle"
+                size={20}
+                color={theme.colors.primary}
+              />
               <Text style={styles.kycStatusText}>KYC Requerido</Text>
             </View>
             <Text style={styles.kycStatusSubtext}>
-              Después de completar tus datos básicos, se iniciará automáticamente la verificación de identidad
+              Después de completar tus datos básicos, se iniciará
+              automáticamente la verificación de identidad
             </Text>
           </View>
         )}
@@ -1253,9 +1354,9 @@ export default function RegisterScreen({ navigation }: any) {
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Foto de Perfil</Text>
           <View style={styles.profilePhotoContainer}>
-            <Image 
-              source={{ uri: professionalFormData.profilePhoto }} 
-              style={styles.profilePhoto} 
+            <Image
+              source={{ uri: professionalFormData.profilePhoto }}
+              style={styles.profilePhoto}
             />
             <Text style={styles.profilePhotoText}>Foto verificada ✓</Text>
           </View>
@@ -1345,10 +1446,6 @@ export default function RegisterScreen({ navigation }: any) {
         <Text style={styles.stepSubtitle}>Cuéntanos sobre tu experiencia</Text>
       </View>
 
-
-
-
-
       <View style={styles.inputContainer}>
         <Text style={styles.inputLabel}>Especialidades</Text>
         <Text style={styles.inputSubtext}>
@@ -1369,25 +1466,41 @@ export default function RegisterScreen({ navigation }: any) {
               <Text style={styles.categoryName}>{category.name}</Text>
               {professionalFormData.specialties.includes(category.id) && (
                 <View style={styles.selectedIndicator}>
-                  <Ionicons name="checkmark-circle" size={20} color={theme.colors.white} />
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color={theme.colors.white}
+                  />
                 </View>
               )}
             </TouchableOpacity>
           ))}
         </View>
-        
+
         {/* Mostrar especialidades seleccionadas */}
         {professionalFormData.specialties.length > 0 && (
           <View style={styles.selectedSpecialtiesContainer}>
-            <Text style={styles.selectedSpecialtiesTitle}>Especialidades seleccionadas:</Text>
+            <Text style={styles.selectedSpecialtiesTitle}>
+              Especialidades seleccionadas:
+            </Text>
             <View style={styles.selectedSpecialtiesList}>
               {professionalFormData.specialties.map((specialtyId) => {
-                const category = categories.find(cat => cat.id === specialtyId);
+                const category = categories.find(
+                  (cat) => cat.id === specialtyId
+                );
                 return (
                   <View key={specialtyId} style={styles.selectedSpecialtyTag}>
-                    <Text style={styles.selectedSpecialtyText}>{category?.name}</Text>
-                    <TouchableOpacity onPress={() => handleRemoveSpecialty(specialtyId)}>
-                      <Ionicons name="close-circle" size={16} color={theme.colors.error} />
+                    <Text style={styles.selectedSpecialtyText}>
+                      {category?.name}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveSpecialty(specialtyId)}
+                    >
+                      <Ionicons
+                        name="close-circle"
+                        size={16}
+                        color={theme.colors.error}
+                      />
                     </TouchableOpacity>
                   </View>
                 );
@@ -1395,7 +1508,7 @@ export default function RegisterScreen({ navigation }: any) {
             </View>
           </View>
         )}
-        
+
         {errors.specialties && (
           <Text style={styles.errorText}>{errors.specialties}</Text>
         )}
@@ -1527,7 +1640,6 @@ export default function RegisterScreen({ navigation }: any) {
         }
         error={errors.priceRange}
       />
-
     </View>
   );
 
@@ -1574,36 +1686,62 @@ export default function RegisterScreen({ navigation }: any) {
                   />
                 </TouchableOpacity>
               </View>
-              
+
               {/* Documento de la certificación */}
               <View style={styles.documentUploadContainer}>
-                <Text style={styles.uploadLabel}>Documento de la certificación:</Text>
+                <Text style={styles.uploadLabel}>
+                  Documento de la certificación:
+                </Text>
                 {professionalFormData.certificationDocuments[index] ? (
                   <View style={styles.documentPreviewContainer}>
-                    {professionalFormData.certificationDocuments[index]?.includes('.pdf') || 
-                     professionalFormData.certificationDocuments[index]?.includes('.doc') ||
-                     professionalFormData.certificationDocuments[index]?.includes('.txt') ||
-                     professionalFormData.certificationDocuments[index]?.includes('.xls') ? (
+                    {professionalFormData.certificationDocuments[
+                      index
+                    ]?.includes(".pdf") ||
+                    professionalFormData.certificationDocuments[
+                      index
+                    ]?.includes(".doc") ||
+                    professionalFormData.certificationDocuments[
+                      index
+                    ]?.includes(".txt") ||
+                    professionalFormData.certificationDocuments[
+                      index
+                    ]?.includes(".xls") ? (
                       // Mostrar documento
                       <View style={styles.documentPreview}>
-                        <Ionicons name="document" size={40} color={theme.colors.primary} />
+                        <Ionicons
+                          name="document"
+                          size={40}
+                          color={theme.colors.primary}
+                        />
                         <Text style={styles.documentName}>
-                          {professionalFormData.certificationDocuments[index]?.split('/').pop() || 'Documento'}
+                          {professionalFormData.certificationDocuments[index]
+                            ?.split("/")
+                            .pop() || "Documento"}
                         </Text>
-                        <Text style={styles.documentType}>Documento cargado ✓</Text>
+                        <Text style={styles.documentType}>
+                          Documento cargado ✓
+                        </Text>
                       </View>
                     ) : (
                       // Mostrar imagen
-                      <Image 
-                        source={{ uri: professionalFormData.certificationDocuments[index] }} 
-                        style={styles.imagePreview} 
+                      <Image
+                        source={{
+                          uri: professionalFormData.certificationDocuments[
+                            index
+                          ],
+                        }}
+                        style={styles.imagePreview}
                       />
                     )}
                     <TouchableOpacity
                       style={styles.removeImageButton}
                       onPress={() => handleRemoveCertificationDocument(index)}
                     >
-                      <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                      <Ionicons
+                        name="close-circle"
+                        size={24}
+                        color={theme.colors.error}
+                      />
                     </TouchableOpacity>
                   </View>
                 ) : (
@@ -1612,13 +1750,21 @@ export default function RegisterScreen({ navigation }: any) {
                       style={styles.certificationUploadButton}
                       onPress={() => selectCertificationDocument(index)}
                     >
-                      <Ionicons name="images" size={24} color={theme.colors.white} />
+                      <Ionicons
+                        name="images"
+                        size={24}
+                        color={theme.colors.white}
+                      />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.certificationUploadButton}
                       onPress={() => selectCertificationPDF(index)}
                     >
-                      <Ionicons name="document" size={24} color={theme.colors.white} />
+                      <Ionicons
+                        name="document"
+                        size={24}
+                        color={theme.colors.white}
+                      />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -1717,65 +1863,104 @@ export default function RegisterScreen({ navigation }: any) {
             {verificationStep === 1 && (
               <View style={styles.stepContainer}>
                 <View style={styles.stepHeader}>
-                  <Ionicons name="card" size={60} color={theme.colors.primary} />
+                  <Ionicons
+                    name="card"
+                    size={60}
+                    color={theme.colors.primary}
+                  />
                   <Text style={styles.stepTitle}>DNI - Frente</Text>
                   <Text style={styles.stepSubtitle}>
-                    Toma una foto del frente de tu DNI para verificar tu identidad
+                    Toma una foto del frente de tu DNI para verificar tu
+                    identidad
                   </Text>
                   <Text style={styles.stepInstructions}>
-                    📋 IMPORTANTE: Debe ser un ESCANEO del DNI completo, no una foto casual.
-                    {'\n'}• Asegúrate de que todo el texto sea legible
-                    {'\n'}• Evita sombras, reflejos o cortes
-                    {'\n'}• Usa buena iluminación
-                    {'\n'}• La validación se realiza INMEDIATAMENTE al subir la imagen
+                    📋 IMPORTANTE: Debe ser un ESCANEO del DNI completo, no una
+                    foto casual.
+                    {"\n"}• Asegúrate de que todo el texto sea legible
+                    {"\n"}• Evita sombras, reflejos o cortes
+                    {"\n"}• Usa buena iluminación
+                    {"\n"}• La validación se realiza INMEDIATAMENTE al subir la
+                    imagen
                   </Text>
                 </View>
-                
+
                 <View style={styles.documentUploadContainer}>
                   {verificationData.dniFront ? (
                     <View style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: verificationData.dniFront }} style={styles.imagePreview} />
-                      
+                      <Image
+                        source={{ uri: verificationData.dniFront }}
+                        style={styles.imagePreview}
+                      />
+
                       {/* Estado de verificación */}
                       <View style={styles.verificationStatusContainer}>
-                        {verificationStatus.dniFront === 'verifying' && (
+                        {verificationStatus.dniFront === "verifying" && (
                           <View style={styles.verifyingStatus}>
-                            <ActivityIndicator size="small" color={theme.colors.primary} />
-                            <Text style={styles.verifyingText}>Verificando...</Text>
+                            <ActivityIndicator
+                              size="small"
+                              color={theme.colors.primary}
+                            />
+                            <Text style={styles.verifyingText}>
+                              Verificando...
+                            </Text>
                           </View>
                         )}
-                        {verificationStatus.dniFront === 'verified' && (
+                        {verificationStatus.dniFront === "verified" && (
                           <View style={styles.verifiedStatus}>
-                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
-                            <Text style={styles.verifiedText}>Verificado ✓</Text>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={20}
+                              color={theme.colors.success}
+                            />
+                            <Text style={styles.verifiedText}>
+                              Verificado ✓
+                            </Text>
                           </View>
                         )}
                       </View>
-                      
+
                       <TouchableOpacity
                         style={styles.removeImageButton}
                         onPress={() => {
-                          setVerificationData(prev => ({ ...prev, dniFront: null }));
-                          setVerificationStatus(prev => ({ ...prev, dniFront: 'pending' }));
+                          setVerificationData((prev) => ({
+                            ...prev,
+                            dniFront: null,
+                          }));
+                          setVerificationStatus((prev) => ({
+                            ...prev,
+                            dniFront: "pending",
+                          }));
                         }}
                       >
-                        <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                        <Ionicons
+                          name="close-circle"
+                          size={24}
+                          color={theme.colors.error}
+                        />
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.uploadButtonsContainer}>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => takeVerificationPhoto('dniFront')}
+                        onPress={() => takeVerificationPhoto("dniFront")}
                       >
-                        <Ionicons name="camera" size={20} color={theme.colors.white} />
+                        <Ionicons
+                          name="camera"
+                          size={20}
+                          color={theme.colors.white}
+                        />
                         <Text style={styles.uploadButtonText}>Cámara</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => selectVerificationImage('dniFront')}
+                        onPress={() => selectVerificationImage("dniFront")}
                       >
-                        <Ionicons name="images" size={20} color={theme.colors.white} />
+                        <Ionicons
+                          name="images"
+                          size={20}
+                          color={theme.colors.white}
+                        />
                         <Text style={styles.uploadButtonText}>Galería</Text>
                       </TouchableOpacity>
                     </View>
@@ -1787,65 +1972,104 @@ export default function RegisterScreen({ navigation }: any) {
             {verificationStep === 2 && (
               <View style={styles.stepContainer}>
                 <View style={styles.stepHeader}>
-                  <Ionicons name="card" size={60} color={theme.colors.primary} />
+                  <Ionicons
+                    name="card"
+                    size={60}
+                    color={theme.colors.primary}
+                  />
                   <Text style={styles.stepTitle}>DNI - Dorso</Text>
                   <Text style={styles.stepSubtitle}>
-                    Toma una foto del dorso de tu DNI para completar la verificación
+                    Toma una foto del dorso de tu DNI para completar la
+                    verificación
                   </Text>
                   <Text style={styles.stepInstructions}>
-                    📋 IMPORTANTE: Debe ser un ESCANEO del DNI completo, no una foto casual.
-                    {'\n'}• Asegúrate de que todo el texto sea legible
-                    {'\n'}• Evita sombras, reflejos o cortes
-                    {'\n'}• Usa buena iluminación
-                    {'\n'}• La validación se realiza INMEDIATAMENTE al subir la imagen
+                    📋 IMPORTANTE: Debe ser un ESCANEO del DNI completo, no una
+                    foto casual.
+                    {"\n"}• Asegúrate de que todo el texto sea legible
+                    {"\n"}• Evita sombras, reflejos o cortes
+                    {"\n"}• Usa buena iluminación
+                    {"\n"}• La validación se realiza INMEDIATAMENTE al subir la
+                    imagen
                   </Text>
                 </View>
-                
+
                 <View style={styles.documentUploadContainer}>
                   {verificationData.dniBack ? (
                     <View style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: verificationData.dniBack }} style={styles.imagePreview} />
-                      
+                      <Image
+                        source={{ uri: verificationData.dniBack }}
+                        style={styles.imagePreview}
+                      />
+
                       {/* Estado de verificación */}
                       <View style={styles.verificationStatusContainer}>
-                        {verificationStatus.dniBack === 'verifying' && (
+                        {verificationStatus.dniBack === "verifying" && (
                           <View style={styles.verifyingStatus}>
-                            <ActivityIndicator size="small" color={theme.colors.primary} />
-                            <Text style={styles.verifyingText}>Verificando...</Text>
+                            <ActivityIndicator
+                              size="small"
+                              color={theme.colors.primary}
+                            />
+                            <Text style={styles.verifyingText}>
+                              Verificando...
+                            </Text>
                           </View>
                         )}
-                        {verificationStatus.dniBack === 'verified' && (
+                        {verificationStatus.dniBack === "verified" && (
                           <View style={styles.verifiedStatus}>
-                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
-                            <Text style={styles.verifiedText}>Verificado ✓</Text>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={20}
+                              color={theme.colors.success}
+                            />
+                            <Text style={styles.verifiedText}>
+                              Verificado ✓
+                            </Text>
                           </View>
                         )}
                       </View>
-                      
+
                       <TouchableOpacity
                         style={styles.removeImageButton}
                         onPress={() => {
-                          setVerificationData(prev => ({ ...prev, dniBack: null }));
-                          setVerificationStatus(prev => ({ ...prev, dniBack: 'pending' }));
+                          setVerificationData((prev) => ({
+                            ...prev,
+                            dniBack: null,
+                          }));
+                          setVerificationStatus((prev) => ({
+                            ...prev,
+                            dniBack: "pending",
+                          }));
                         }}
                       >
-                        <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                        <Ionicons
+                          name="close-circle"
+                          size={24}
+                          color={theme.colors.error}
+                        />
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.uploadButtonsContainer}>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => takeVerificationPhoto('dniBack')}
+                        onPress={() => takeVerificationPhoto("dniBack")}
                       >
-                        <Ionicons name="camera" size={20} color={theme.colors.white} />
+                        <Ionicons
+                          name="camera"
+                          size={20}
+                          color={theme.colors.white}
+                        />
                         <Text style={styles.uploadButtonText}>Cámara</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => selectVerificationImage('dniBack')}
+                        onPress={() => selectVerificationImage("dniBack")}
                       >
-                        <Ionicons name="images" size={20} color={theme.colors.white} />
+                        <Ionicons
+                          name="images"
+                          size={20}
+                          color={theme.colors.white}
+                        />
                         <Text style={styles.uploadButtonText}>Galería</Text>
                       </TouchableOpacity>
                     </View>
@@ -1857,66 +2081,105 @@ export default function RegisterScreen({ navigation }: any) {
             {verificationStep === 3 && (
               <View style={styles.stepContainer}>
                 <View style={styles.stepHeader}>
-                  <Ionicons name="person" size={60} color={theme.colors.primary} />
+                  <Ionicons
+                    name="person"
+                    size={60}
+                    color={theme.colors.primary}
+                  />
                   <Text style={styles.stepTitle}>Foto de Perfil</Text>
                   <Text style={styles.stepSubtitle}>
-                    Toma una foto de tu rostro para completar tu perfil profesional
+                    Toma una foto de tu rostro para completar tu perfil
+                    profesional
                   </Text>
                   <Text style={styles.stepInstructions}>
-                    📸 IMPORTANTE: Debe ser una SELFIE clara de tu rostro, no una foto de objeto o grupo.
-                    {'\n'}• Enfoca tu rostro claramente
-                    {'\n'}• Usa buena iluminación natural
-                    {'\n'}• Evita sombras o reflejos
-                    {'\n'}• No uses filtros o efectos
-                    {'\n'}• La validación se realiza INMEDIATAMENTE al subir la imagen
+                    📸 IMPORTANTE: Debe ser una SELFIE clara de tu rostro, no
+                    una foto de objeto o grupo.
+                    {"\n"}• Enfoca tu rostro claramente
+                    {"\n"}• Usa buena iluminación natural
+                    {"\n"}• Evita sombras o reflejos
+                    {"\n"}• No uses filtros o efectos
+                    {"\n"}• La validación se realiza INMEDIATAMENTE al subir la
+                    imagen
                   </Text>
                 </View>
-                
+
                 <View style={styles.documentUploadContainer}>
                   {verificationData.profilePhoto ? (
                     <View style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: verificationData.profilePhoto }} style={styles.imagePreview} />
-                      
+                      <Image
+                        source={{ uri: verificationData.profilePhoto }}
+                        style={styles.imagePreview}
+                      />
+
                       {/* Estado de verificación */}
                       <View style={styles.verificationStatusContainer}>
-                        {verificationStatus.profilePhoto === 'verifying' && (
+                        {verificationStatus.profilePhoto === "verifying" && (
                           <View style={styles.verifyingStatus}>
-                            <ActivityIndicator size="small" color={theme.colors.primary} />
-                            <Text style={styles.verifyingText}>Verificando...</Text>
+                            <ActivityIndicator
+                              size="small"
+                              color={theme.colors.primary}
+                            />
+                            <Text style={styles.verifyingText}>
+                              Verificando...
+                            </Text>
                           </View>
                         )}
-                        {verificationStatus.profilePhoto === 'verified' && (
+                        {verificationStatus.profilePhoto === "verified" && (
                           <View style={styles.verifiedStatus}>
-                            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
-                            <Text style={styles.verifiedText}>Verificado ✓</Text>
+                            <Ionicons
+                              name="checkmark-circle"
+                              size={20}
+                              color={theme.colors.success}
+                            />
+                            <Text style={styles.verifiedText}>
+                              Verificado ✓
+                            </Text>
                           </View>
                         )}
                       </View>
-                      
+
                       <TouchableOpacity
                         style={styles.removeImageButton}
                         onPress={() => {
-                          setVerificationData(prev => ({ ...prev, profilePhoto: null }));
-                          setVerificationStatus(prev => ({ ...prev, profilePhoto: 'pending' }));
+                          setVerificationData((prev) => ({
+                            ...prev,
+                            profilePhoto: null,
+                          }));
+                          setVerificationStatus((prev) => ({
+                            ...prev,
+                            profilePhoto: "pending",
+                          }));
                         }}
                       >
-                        <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                        <Ionicons
+                          name="close-circle"
+                          size={24}
+                          color={theme.colors.error}
+                        />
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={styles.uploadButtonsContainer}>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => takeVerificationPhoto('profilePhoto')}
+                        onPress={() => takeVerificationPhoto("profilePhoto")}
                       >
-                        <Ionicons name="camera" size={20} color={theme.colors.white} />
+                        <Ionicons
+                          name="camera"
+                          size={20}
+                          color={theme.colors.white}
+                        />
                         <Text style={styles.uploadButtonText}>Cámara</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => selectVerificationImage('profilePhoto')}
+                        onPress={() => selectVerificationImage("profilePhoto")}
                       >
-                        <Ionicons name="images" size={20} color={theme.colors.white} />
+                        <Ionicons
+                          name="images"
+                          size={20}
+                          color={theme.colors.white}
+                        />
                         <Text style={styles.uploadButtonText}>Galería</Text>
                       </TouchableOpacity>
                     </View>
@@ -1943,7 +2206,15 @@ export default function RegisterScreen({ navigation }: any) {
                 verificationStep === 1 && styles.nextButtonFull,
               ]}
               onPress={handleVerificationNext}
-              disabled={!verificationData[verificationStep === 1 ? 'dniFront' : verificationStep === 2 ? 'dniBack' : 'profilePhoto']}
+              disabled={
+                !verificationData[
+                  verificationStep === 1
+                    ? "dniFront"
+                    : verificationStep === 2
+                    ? "dniBack"
+                    : "profilePhoto"
+                ]
+              }
             >
               <Text style={styles.nextButtonText}>
                 {verificationStep === 3 ? "Finalizar" : "Siguiente"}
@@ -2017,7 +2288,6 @@ export default function RegisterScreen({ navigation }: any) {
             {currentStep === 2 && renderProfessionalStep2()}
             {currentStep === 3 && renderProfessionalStep3()}
             {currentStep === 4 && renderProfessionalStep4()}
-
           </View>
 
           {/* Footer con botones */}
@@ -2042,10 +2312,13 @@ export default function RegisterScreen({ navigation }: any) {
                 <ActivityIndicator size="small" color={theme.colors.white} />
               ) : (
                 <>
-                                <Text style={styles.nextButtonText}>
-                {currentStep === 1 && !kycCompleted ? "Iniciar Verificación KYC" : 
-                 currentStep === 4 ? "Completar Registro" : "Siguiente"}
-              </Text>
+                  <Text style={styles.nextButtonText}>
+                    {currentStep === 1 && !kycCompleted
+                      ? "Iniciar Verificación KYC"
+                      : currentStep === 4
+                      ? "Completar Registro"
+                      : "Siguiente"}
+                  </Text>
                   <Ionicons
                     name="arrow-forward"
                     size={20}
@@ -2057,22 +2330,23 @@ export default function RegisterScreen({ navigation }: any) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-        </View>
+    </View>
   );
 
   // Renderizar según el estado
   if (showKYCFlow) {
     // Validar que hay datos básicos antes de mostrar el KYC
-    const hasBasicData = professionalFormData.fullName && 
-                        professionalFormData.email && 
-                        professionalFormData.phone;
-    
+    const hasBasicData =
+      professionalFormData.fullName &&
+      professionalFormData.email &&
+      professionalFormData.phone;
+
     if (!hasBasicData) {
       // Si no hay datos básicos, volver al formulario
       setShowKYCFlow(false);
       return renderProfessionalForm();
     }
-    
+
     return (
       <KYCFlow
         userData={{
@@ -2403,8 +2677,8 @@ const styles = StyleSheet.create({
     color: theme.colors.warning,
     marginTop: theme.spacing.sm,
     lineHeight: 16,
-    textAlign: 'center',
-    backgroundColor: theme.colors.warning + '20',
+    textAlign: "center",
+    backgroundColor: theme.colors.warning + "20",
     padding: theme.spacing.sm,
     borderRadius: theme.borderRadius.sm,
     borderLeftWidth: 3,
@@ -2612,35 +2886,35 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   imagePreviewContainer: {
-    position: 'relative',
+    position: "relative",
     marginTop: theme.spacing.sm,
   },
   imagePreview: {
-    width: '100%',
+    width: "100%",
     height: 200,
     borderRadius: theme.borderRadius.md,
-    resizeMode: 'cover',
+    resizeMode: "cover",
   },
 
   uploadButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexDirection: "row",
+    justifyContent: "space-around",
     marginTop: theme.spacing.sm,
   },
   uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: theme.colors.primary,
     paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
     borderRadius: theme.borderRadius.md,
     minWidth: 100,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   uploadButtonText: {
     color: theme.colors.white,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: theme.spacing.xs,
   },
   // Estilos para el modal
@@ -2657,12 +2931,12 @@ const styles = StyleSheet.create({
     padding: theme.spacing.xl,
     paddingTop: theme.spacing.xxl + 60,
     paddingBottom: theme.spacing.xl,
-    alignItems: 'center',
-    position: 'relative',
+    alignItems: "center",
+    position: "relative",
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: theme.colors.white,
     marginBottom: theme.spacing.xs,
   },
@@ -2672,11 +2946,11 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   closeModalButton: {
-    position: 'absolute',
+    position: "absolute",
     top: theme.spacing.xl + 60,
     right: theme.spacing.xl,
     padding: theme.spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: theme.borderRadius.md,
   },
   modalProgressContainer: {
@@ -2689,9 +2963,9 @@ const styles = StyleSheet.create({
     paddingTop: theme.spacing.xl,
   },
   modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: theme.spacing.xl,
     paddingBottom: theme.spacing.xxl + 20,
     borderTopWidth: 1,
@@ -2705,22 +2979,22 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   verificationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: theme.colors.primary,
     paddingVertical: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     borderRadius: theme.borderRadius.md,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   verificationButtonText: {
     color: theme.colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: theme.spacing.sm,
   },
   profilePhotoContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: theme.spacing.sm,
   },
   profilePhoto: {
@@ -2732,38 +3006,38 @@ const styles = StyleSheet.create({
   profilePhotoText: {
     fontSize: 14,
     color: theme.colors.success,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   // Estilos para estados de verificación
   verificationStatusContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: theme.spacing.sm,
     left: theme.spacing.sm,
     right: theme.spacing.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
     borderRadius: theme.borderRadius.md,
     padding: theme.spacing.sm,
-    alignItems: 'center',
+    alignItems: "center",
   },
   verifyingStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing.xs,
   },
   verifyingText: {
     fontSize: 14,
     color: theme.colors.primary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   verifiedStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: theme.spacing.xs,
   },
   verifiedText: {
     fontSize: 14,
     color: theme.colors.success,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   // Estilos para el header de verificación simplificado
   verificationHeader: {
@@ -2773,7 +3047,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.white,
   },
   verificationBackButton: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     padding: theme.spacing.sm,
     borderRadius: theme.borderRadius.md,
     backgroundColor: theme.colors.surface,
@@ -2787,16 +3061,16 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
     backgroundColor: theme.colors.white,
     marginTop: 0,
-    width: '100%',
-    alignSelf: 'center',
-    justifyContent: 'center',
+    width: "100%",
+    alignSelf: "center",
+    justifyContent: "center",
   },
   buttonSpacer: {
     width: theme.spacing.md,
   },
   // Estilos para especialidades múltiples
   selectedIndicator: {
-    position: 'absolute',
+    position: "absolute",
     top: theme.spacing.xs,
     right: theme.spacing.xs,
     backgroundColor: theme.colors.primary,
@@ -2810,19 +3084,19 @@ const styles = StyleSheet.create({
   },
   selectedSpecialtiesTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
   },
   selectedSpecialtiesList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: theme.spacing.xs,
   },
   selectedSpecialtyTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary + '20',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: theme.colors.primary + "20",
     borderRadius: theme.borderRadius.full,
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
@@ -2831,7 +3105,7 @@ const styles = StyleSheet.create({
   selectedSpecialtyText: {
     fontSize: 14,
     color: theme.colors.primary,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   // Estilos para tarjetas de certificación
   certificationCard: {
@@ -2843,21 +3117,21 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
   },
   certificationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: theme.spacing.md,
   },
   certificationName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: theme.colors.text,
     flex: 1,
   },
   // Estilos para botones de certificación
   certificationUploadButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
     marginTop: theme.spacing.sm,
     gap: theme.spacing.lg,
   },
@@ -2866,8 +3140,8 @@ const styles = StyleSheet.create({
     height: 50,
     backgroundColor: theme.colors.primary,
     borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -2876,33 +3150,33 @@ const styles = StyleSheet.create({
   },
   // Estilos para vista previa de documentos
   documentPreviewContainer: {
-    position: 'relative',
+    position: "relative",
     marginTop: theme.spacing.sm,
   },
   documentPreview: {
-    width: '100%',
+    width: "100%",
     height: 120,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius.md,
     borderWidth: 2,
-    borderColor: theme.colors.primary + '30',
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: theme.colors.primary + "30",
+    borderStyle: "dashed",
+    justifyContent: "center",
+    alignItems: "center",
     padding: theme.spacing.md,
   },
   documentName: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     color: theme.colors.text,
     marginTop: theme.spacing.sm,
-    textAlign: 'center',
+    textAlign: "center",
   },
   documentType: {
     fontSize: 12,
     color: theme.colors.success,
     marginTop: theme.spacing.xs,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   // Estilos para el estado del KYC
   kycStatusContainer: {
@@ -2913,18 +3187,18 @@ const styles = StyleSheet.create({
     borderLeftColor: theme.colors.primary,
   },
   kycStatusSuccess: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   kycStatusPending: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: theme.spacing.sm,
   },
   kycStatusText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: theme.colors.text,
     marginLeft: theme.spacing.sm,
   },
