@@ -16,8 +16,9 @@ interface OTPVerificationProps {
   email?: string;
   phone?: string;
   onVerificationComplete: (isVerified: boolean) => void;
-  onResendCode: () => Promise<boolean>;
+  onResendCode?: () => Promise<boolean>; // Hacer opcional
   verificationType: "email" | "phone";
+  purpose?: string; // Agregar propósito para el OTP
 }
 
 export const OTPVerification: React.FC<OTPVerificationProps> = ({
@@ -26,6 +27,7 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
   onVerificationComplete,
   onResendCode,
   verificationType,
+  purpose = "kyc_verification",
 }) => {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +38,71 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
   const maxAttempts = 3;
 
   const inputRefs = useRef<TextInput[]>([]);
+
+  // Función interna para enviar OTP
+  const sendOTP = async (): Promise<boolean> => {
+    try {
+      const contactInfo = verificationType === "email" ? email : phone;
+      if (!contactInfo || contactInfo.trim() === "") {
+        Alert.alert(
+          "Datos Faltantes",
+          `No se ha proporcionado ${verificationType === "email" ? "email" : "teléfono"}. Por favor, completa tus datos básicos primero.`,
+          [{ text: "OK" }]
+        );
+        return false;
+      }
+
+      console.log(`[OTP] Enviando código ${verificationType} a: ${contactInfo}`);
+      
+      // Usar el email del usuario que recibe la verificación como emailFrom
+      const emailFrom = verificationType === "email" ? contactInfo : null;
+      const response = await authAPI.sendOTP(verificationType, contactInfo, purpose, emailFrom);
+      
+      if (response.success) {
+        const maskedInfo = response.data.maskedContact;
+        Alert.alert(
+          "Código Enviado",
+          `Se ha enviado un código de verificación a ${maskedInfo}`,
+          [{ text: "OK" }]
+        );
+        return true;
+      } else {
+        throw new Error(response.error || "Error enviando código");
+      }
+    } catch (error) {
+      console.error("Error enviando OTP:", error);
+      Alert.alert("Error", "No se pudo enviar el código. Intenta de nuevo.");
+      return false;
+    }
+  };
+
+  // Resetear estados cuando cambie el tipo de verificación
+  useEffect(() => {
+    setOtp(["", "", "", "", "", ""]);
+    setTimeLeft(60);
+    setCanResend(false);
+    setAttempts(0);
+    setIsLoading(false);
+    setIsResending(false);
+    inputRefs.current[0]?.focus();
+  }, [verificationType]);
+
+  // Enviar OTP automáticamente al cargar el componente
+  useEffect(() => {
+    const sendInitialOTP = async () => {
+      const hasValidContact =
+        verificationType === "email"
+          ? email && email.trim() !== ""
+          : phone && phone.trim() !== "";
+
+      if (hasValidContact) {
+        console.log(`[OTP] Enviando OTP inicial para ${verificationType}`);
+        await sendOTP();
+      }
+    };
+
+    sendInitialOTP();
+  }, [verificationType, email, phone, purpose]);
 
   useEffect(() => {
     // Solo iniciar el timer si hay datos de contacto válidos
@@ -144,7 +211,8 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
     setIsResending(true);
 
     try {
-      const success = await onResendCode();
+      // Usar la función onResendCode del padre si existe, sino usar la función interna
+      const success = onResendCode ? await onResendCode() : await sendOTP();
 
       if (success) {
         setTimeLeft(60);
@@ -152,10 +220,13 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
         setAttempts(0);
         setOtp(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
-        Alert.alert(
-          "Código enviado",
-          "Se ha enviado un nuevo código de verificación"
-        );
+        // Solo mostrar alerta si usamos la función interna (para evitar duplicados)
+        if (!onResendCode) {
+          Alert.alert(
+            "Código enviado",
+            "Se ha enviado un nuevo código de verificación"
+          );
+        }
       } else {
         Alert.alert("Error", "No se pudo enviar el código. Intenta de nuevo.");
       }

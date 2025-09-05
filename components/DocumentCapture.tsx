@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,13 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { theme } from '../config/theme';
+import { documentAPI } from '../services/api';
 
 interface DocumentCaptureProps {
   onDocumentCaptured: (frontUri: string, backUri: string) => void;
@@ -21,6 +24,18 @@ interface DocumentValidation {
   isValid: boolean;
   issues: string[];
   score: number;
+  confidence?: 'low' | 'medium' | 'high';
+  recommendations?: string[];
+}
+
+interface DocumentValidationResult {
+  isValid: boolean;
+  score: number;
+  issues: string[];
+  confidence: 'low' | 'medium' | 'high';
+  documentType: string;
+  side: string;
+  recommendations: string[];
 }
 
 export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
@@ -33,47 +48,58 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
   const [backValidation, setBackValidation] = useState<DocumentValidation | null>(null);
   const [isValidating, setIsValidating] = useState(false);
 
+  // Resetear estado de validación cuando se cambia de documento
+  useEffect(() => {
+    // Resetear validaciones cuando se monta el componente
+    setFrontValidation(null);
+    setBackValidation(null);
+    setIsValidating(false);
+  }, []);
+
   const validateDocument = async (imageUri: string, type: 'front' | 'back'): Promise<DocumentValidation> => {
-    // Simular validación de documento
-    // En producción, aquí integrarías con un servicio de OCR/validación de documentos
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const issues: string[] = [];
-    let score = 100;
-    
-    // Simular diferentes tipos de validaciones
-    const random = Math.random();
-    
-    if (random < 0.1) {
-      issues.push('Documento no legible');
-      score -= 40;
+    try {
+      console.log(`[DocumentCapture] Iniciando validación con Gemini AI para DNI ${type}`);
+      
+      // Convertir imagen a base64
+      const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      // Usar API del backend para validación con OCR
+      const response: any = await documentAPI.validateDNI(base64Image, type); // Call new backend API
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Error en la validación');
+      }
+      
+      const validationResult = response.data;
+      
+      console.log(`[DocumentCapture] Resultado validación Gemini:`, {
+        isValid: validationResult.isValid,
+        score: validationResult.score,
+        issues: validationResult.issues,
+        confidence: validationResult.confidence,
+        documentType: validationResult.documentType
+      });
+      
+      return {
+        isValid: validationResult.isValid,
+        issues: validationResult.issues,
+        score: validationResult.score,
+        confidence: validationResult.confidence,
+        recommendations: validationResult.recommendations
+      };
+      
+    } catch (error) {
+      console.error('[DocumentCapture] Error en validación con Gemini:', error);
+      return {
+        isValid: false,
+        issues: ['Error al validar el documento con IA. Intenta nuevamente.'],
+        score: 0,
+        confidence: 'low',
+        recommendations: ['Verifica que la imagen sea clara y completa']
+      };
     }
-    
-    if (random < 0.2) {
-      issues.push('Reflejos detectados');
-      score -= 20;
-    }
-    
-    if (random < 0.15) {
-      issues.push('Documento cortado');
-      score -= 30;
-    }
-    
-    if (type === 'front' && random < 0.1) {
-      issues.push('Fecha de vencimiento no válida');
-      score -= 25;
-    }
-    
-    if (random < 0.05) {
-      issues.push('Documento no reconocido');
-      score -= 50;
-    }
-    
-    return {
-      isValid: score >= 70,
-      issues,
-      score,
-    };
   };
 
   const requestCameraPermission = async () => {
@@ -104,6 +130,13 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
         
+        // Resetear estado de validación anterior
+        if (type === 'front') {
+          setFrontValidation(null);
+        } else {
+          setBackValidation(null);
+        }
+        
         setIsValidating(true);
         
         try {
@@ -118,15 +151,20 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
           }
           
           if (!validation.isValid) {
+            const sideText = type === 'front' ? 'frente' : 'dorso';
+            const sideTextUpper = type === 'front' ? 'FRENTE' : 'DORSO';
+            
             Alert.alert(
               'Documento no válido',
-              `El documento presenta los siguientes problemas:\n\n• ${validation.issues.join('\n• ')}\n\nPor favor, toma otra foto que cumpla con los requisitos.`,
+              `🔍 El sistema detectó que esta imagen no es el ${sideText} de un DNI argentino válido.\n\nPor favor, captura una imagen del ${sideText} del documento de identidad.`,
               [{ text: 'Entendido' }]
             );
           } else {
+            const sideText = type === 'front' ? 'frente' : 'dorso';
+            
             Alert.alert(
               'Documento válido',
-              'El documento ha sido validado correctamente.',
+              `✅ ${sideText.toUpperCase()} del DNI argentino detectado correctamente.`,
               [{ text: 'Continuar' }]
             );
           }
@@ -153,6 +191,13 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
         
+        // Resetear estado de validación anterior
+        if (type === 'front') {
+          setFrontValidation(null);
+        } else {
+          setBackValidation(null);
+        }
+        
         setIsValidating(true);
         
         try {
@@ -167,15 +212,19 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
           }
           
           if (!validation.isValid) {
+            const sideText = type === 'front' ? 'frente' : 'dorso';
+            
             Alert.alert(
               'Documento no válido',
-              `El documento presenta los siguientes problemas:\n\n• ${validation.issues.join('\n• ')}\n\nPor favor, selecciona otra imagen que cumpla con los requisitos.`,
+              `🔍 El sistema detectó que esta imagen no es el ${sideText} de un DNI argentino válido.\n\nPor favor, selecciona una imagen del ${sideText} del documento de identidad.`,
               [{ text: 'Entendido' }]
             );
           } else {
+            const sideText = type === 'front' ? 'frente' : 'dorso';
+            
             Alert.alert(
               'Documento válido',
-              'El documento ha sido validado correctamente.',
+              `✅ ${sideText.toUpperCase()} del DNI argentino detectado correctamente.`,
               [{ text: 'Continuar' }]
             );
           }
@@ -292,10 +341,9 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
         
         {validation && !validation.isValid && (
           <View style={styles.issuesContainer}>
-            <Text style={styles.issuesTitle}>Problemas detectados:</Text>
-            {validation.issues.map((issue, index) => (
-              <Text key={index} style={styles.issueText}>• {issue}</Text>
-            ))}
+            <Text style={styles.issuesTitle}>🔍 Validación por OCR:</Text>
+            <Text style={styles.issueText}>• Esta imagen no es el {type === 'front' ? 'frente' : 'dorso'} de un DNI argentino válido</Text>
+            <Text style={styles.issueText}>• Por favor, captura una imagen del {type === 'front' ? 'frente' : 'dorso'} del documento de identidad</Text>
           </View>
         )}
       </View>
@@ -312,7 +360,12 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
         <View style={styles.placeholder} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView 
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+      >
         <View style={styles.instructionsContainer}>
           <Ionicons name="information-circle" size={24} color={theme.colors.primary} />
           <Text style={styles.instructionsText}>
@@ -327,10 +380,11 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
         {isValidating && (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>Validando documento...</Text>
+            <Text style={styles.loadingText}>🔍 Verificando documento del DNI...</Text>
+            <Text style={styles.loadingSubtext}>Analizando imagen con OCR</Text>
           </View>
         )}
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
@@ -377,7 +431,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  contentContainer: {
     padding: theme.spacing.lg,
+    paddingBottom: theme.spacing.xl,
   },
   instructionsContainer: {
     flexDirection: 'row',
@@ -511,6 +568,18 @@ const styles = StyleSheet.create({
     color: theme.colors.error,
     marginBottom: theme.spacing.xs,
   },
+  recommendationsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.primary,
+    marginTop: theme.spacing.sm,
+    marginBottom: theme.spacing.xs,
+  },
+  recommendationText: {
+    fontSize: 12,
+    color: theme.colors.primary,
+    marginBottom: theme.spacing.xs,
+  },
   loadingContainer: {
     alignItems: 'center',
     padding: theme.spacing.xl,
@@ -519,11 +588,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.md,
+    fontWeight: '600',
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.xs,
+    textAlign: 'center',
   },
   footer: {
     padding: theme.spacing.lg,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    paddingBottom: 50,
   },
   continueButton: {
     flexDirection: 'row',

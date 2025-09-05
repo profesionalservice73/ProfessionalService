@@ -75,8 +75,9 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
 
       console.log(`[OTP] Enviando código ${type} a: ${contactInfo}`);
       
-      // Llamada real a la API
-      const response = await authAPI.sendOTP(type, contactInfo, 'kyc_verification');
+      // Llamada real a la API - usar el email del usuario que recibe la verificación
+      const emailFrom = type === 'email' ? contactInfo : null;
+      const response = await authAPI.sendOTP(type, contactInfo, 'kyc_verification', emailFrom);
       
       if (response.success) {
         const maskedInfo = response.data.maskedContact;
