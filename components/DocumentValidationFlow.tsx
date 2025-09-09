@@ -12,7 +12,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { theme } from '../config/theme';
+import { documentAPI } from '../services/api';
 
 interface DocumentValidationFlowProps {
   onValidationComplete: (isValid: boolean, frontImage: string, backImage: string, profileImage: string) => void;
@@ -118,20 +120,30 @@ export const DocumentValidationFlow: React.FC<DocumentValidationFlowProps> = ({
   };
 
   const validateFrontDocument = async (imageUri: string) => {
-    // Simular validación OCR del frente
-    setTimeout(() => {
-      const isValid = Math.random() > 0.2; // 80% de éxito
+    try {
+      console.log('Validando documento frontal con OCR...');
+      
+      // Convertir imagen a base64
+      const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Usar API del backend para validación con OCR
+      const response = await documentAPI.validateDNI(base64Image, 'front');
+      
+      console.log('Respuesta de validación frontal:', response);
       
       const result = {
-        isValid,
-        message: isValid 
+        isValid: response.valid,
+        message: response.valid 
           ? 'Documento frontal validado exitosamente' 
-          : 'Error en la validación del documento frontal',
-        details: isValid 
+          : response.message || 'Error en la validación del documento frontal',
+        details: response.valid 
           ? [
               '✓ Foto frontal clara y legible',
               '✓ Información del documento visible',
-              '✓ Documento no expirado'
+              '✓ Documento no expirado',
+              `✓ Confianza: ${response.confidence}%`
             ]
           : [
               '✗ Foto frontal borrosa o ilegible',
@@ -142,7 +154,7 @@ export const DocumentValidationFlow: React.FC<DocumentValidationFlowProps> = ({
       
       setValidationResult(result);
       
-      if (isValid) {
+      if (response.valid) {
         setCurrentStep('front-validated');
         // Continuar automáticamente al siguiente paso
         setTimeout(() => {
@@ -151,24 +163,49 @@ export const DocumentValidationFlow: React.FC<DocumentValidationFlowProps> = ({
       } else {
         setCurrentStep('front-capture');
       }
-    }, 2000);
+    } catch (error) {
+      console.error('Error validando documento frontal:', error);
+      
+      const result = {
+        isValid: false,
+        message: 'Error al validar el documento frontal',
+        details: [
+          '✗ Error de conexión con el servidor',
+          '✗ No se pudo procesar la imagen',
+          '✗ Intenta de nuevo'
+        ]
+      };
+      
+      setValidationResult(result);
+      setCurrentStep('front-capture');
+    }
   };
 
   const validateBackDocument = async (imageUri: string) => {
-    // Simular validación OCR del reverso
-    setTimeout(() => {
-      const isValid = Math.random() > 0.2; // 80% de éxito
+    try {
+      console.log('Validando documento trasero con OCR...');
+      
+      // Convertir imagen a base64
+      const base64Image = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Usar API del backend para validación con OCR
+      const response = await documentAPI.validateDNI(base64Image, 'back');
+      
+      console.log('Respuesta de validación trasera:', response);
       
       const result = {
-        isValid,
-        message: isValid 
+        isValid: response.valid,
+        message: response.valid 
           ? 'Documento trasero validado exitosamente' 
-          : 'Error en la validación del documento trasero',
-        details: isValid 
+          : response.message || 'Error en la validación del documento trasero',
+        details: response.valid 
           ? [
               '✓ Foto trasera clara y legible',
               '✓ Información del documento visible',
-              '✓ Documento no expirado'
+              '✓ Documento no expirado',
+              `✓ Confianza: ${response.confidence}%`
             ]
           : [
               '✗ Foto trasera borrosa o ilegible',
@@ -179,7 +216,7 @@ export const DocumentValidationFlow: React.FC<DocumentValidationFlowProps> = ({
       
       setValidationResult(result);
       
-      if (isValid) {
+      if (response.valid) {
         setCurrentStep('back-validated');
         // Continuar automáticamente al siguiente paso
         setTimeout(() => {
@@ -188,7 +225,22 @@ export const DocumentValidationFlow: React.FC<DocumentValidationFlowProps> = ({
       } else {
         setCurrentStep('back-capture');
       }
-    }, 2000);
+    } catch (error) {
+      console.error('Error validando documento trasero:', error);
+      
+      const result = {
+        isValid: false,
+        message: 'Error al validar el documento trasero',
+        details: [
+          '✗ Error de conexión con el servidor',
+          '✗ No se pudo procesar la imagen',
+          '✗ Intenta de nuevo'
+        ]
+      };
+      
+      setValidationResult(result);
+      setCurrentStep('back-capture');
+    }
   };
 
   const retryValidation = (side: 'front' | 'back') => {

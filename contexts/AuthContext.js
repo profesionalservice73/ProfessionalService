@@ -117,44 +117,20 @@ export const AuthProvider = ({ children }) => {
         });
         
         if (response.success) {
-          // Ahora completar el registro profesional con todos los datos
-          try {
-            const { professionalAPI } = require('../services/api');
-            const professionalData = {
-              specialties: userData.specialties,
-              experience: userData.experience,
-              description: userData.description,
-              location: userData.location,
-              availability: userData.availability,
-              responseTime: userData.responseTime,
-              profileImage: userData.profileImage,
-              dniFrontImage: userData.dniFrontImage,
-              dniBackImage: userData.dniBackImage,
-              services: userData.services,
-              priceRange: userData.priceRange,
-              certifications: userData.certifications,
-              certificationDocuments: userData.certificationDocuments,
-              languages: userData.languages,
-            };
-            
-            console.log('Completando registro profesional con datos:', professionalData);
-            console.log('ID del usuario registrado:', response.data.id);
-            
-            const professionalResponse = await professionalAPI.completeRegistration(professionalData, response.data.id);
-            
-            if (professionalResponse.success) {
-              return { 
-                success: true, 
-                message: 'Registro completado exitosamente. Ya puedes iniciar sesión.',
-                userId: response.data.id // Agregar el userId a la respuesta
-              };
-            } else {
-              return { success: false, message: professionalResponse.error || 'Error al completar el registro profesional' };
+          // NO hacer login automático, solo retornar éxito para que vaya al login
+          setLoading(false);
+          
+          return { 
+            success: true, 
+            message: 'Registro completado exitosamente. Por favor, inicia sesión.',
+            data: {
+              id: response.data.id,
+              fullName: userData.fullName,
+              email: userData.email,
+              phone: userData.phone,
+              userType: 'professional'
             }
-          } catch (professionalError) {
-            console.error('Error completing professional registration:', professionalError);
-            return { success: false, message: 'Error al completar el registro profesional' };
-          }
+          };
         } else {
           return { success: false, message: response.error };
         }
@@ -176,7 +152,19 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       
       // Limpiar sesión en el backend
-      await sessionService.clearSession();
+      if (sessionId) {
+        try {
+          await fetch(`${process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.94:3000'}/api/v1/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ sessionId }),
+          });
+        } catch (error) {
+          console.error('Error calling logout endpoint:', error);
+        }
+      }
       
       // Limpiar estado
       setUser(null);
@@ -185,6 +173,8 @@ export const AuthProvider = ({ children }) => {
       // Limpiar AsyncStorage
       await AsyncStorage.removeItem('user');
       await AsyncStorage.removeItem('sessionId');
+      
+      console.log('AuthContext - Logout completado');
       
     } catch (error) {
       console.error('Logout error:', error);
@@ -210,7 +200,7 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateUser,
-    isAuthenticated: !!user,
+    isAuthenticated: !!user && !!sessionId,
   };
 
   return (

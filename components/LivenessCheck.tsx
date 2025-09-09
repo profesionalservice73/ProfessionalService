@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../config/theme';
+import { faceValidationAPI } from '../services/api';
 
 interface LivenessCheckProps {
   onSelfieCaptured: (selfieUri: string) => void;
@@ -41,6 +42,7 @@ export const LivenessCheck: React.FC<LivenessCheckProps> = ({
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [livenessResult, setLivenessResult] = useState<LivenessResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [validationProgress, setValidationProgress] = useState<string>('');
   const [challengeTimer, setChallengeTimer] = useState(0);
   
   const progressAnimation = useRef(new Animated.Value(0)).current;
@@ -160,74 +162,104 @@ export const LivenessCheck: React.FC<LivenessCheckProps> = ({
   };
 
   const captureSelfie = async () => {
+    console.log(`[LivenessCheck] 📷 Iniciando captura de selfie...`);
+    
+    const permissionStart = Date.now();
     const hasPermission = await requestCameraPermission();
-    if (!hasPermission) return;
+    const permissionTime = Date.now() - permissionStart;
+    console.log(`[LivenessCheck] 🔐 Permisos verificados en ${permissionTime}ms: ${hasPermission ? 'OK' : 'DENEGADO'}`);
+    
+    if (!hasPermission) {
+      console.log(`[LivenessCheck] ❌ Sin permisos de cámara - abortando captura`);
+      return;
+    }
 
     try {
+      console.log(`[LivenessCheck] 📸 Abriendo cámara con configuración:`, {
+        mediaTypes: 'Images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8
+      });
+      
+      const cameraStart = Date.now();
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1], // Selfie cuadrada
         quality: 0.8,
       });
+      const cameraTime = Date.now() - cameraStart;
+      
+      console.log(`[LivenessCheck] 📷 Cámara cerrada después de ${cameraTime}ms`);
+      console.log(`[LivenessCheck] 📊 Resultado de cámara:`, {
+        canceled: result.canceled,
+        hasAssets: result.assets && result.assets.length > 0,
+        assetCount: result.assets ? result.assets.length : 0
+      });
 
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
+        console.log(`[LivenessCheck] ✅ Selfie capturada exitosamente: ${imageUri}`);
+        console.log(`[LivenessCheck] 📏 Detalles de la imagen:`, {
+          uri: imageUri,
+          width: result.assets[0].width,
+          height: result.assets[0].height,
+          fileSize: result.assets[0].fileSize
+        });
+        
         setSelfieImage(imageUri);
         setCurrentStep('validation');
+        
+        console.log(`[LivenessCheck] 🔄 Iniciando validación de selfie...`);
         validateLiveness(imageUri);
+      } else {
+        console.log(`[LivenessCheck] ❌ Captura cancelada o sin assets`);
       }
     } catch (error) {
+      console.error(`[LivenessCheck] 💥 Error capturando selfie:`, error);
       Alert.alert('Error', 'Error al capturar la selfie');
     }
   };
 
   const validateLiveness = async (imageUri: string) => {
+    console.log(`[LivenessCheck] 🚀 Validación simple de selfie`);
+    
     setIsValidating(true);
+    setValidationProgress('Validando selfie...');
     
     try {
-      // Simular validación de liveness
-      // En producción, aquí integrarías con un servicio de detección de vida
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Crear archivo para enviar al backend
+      const selfieFile = {
+        uri: imageUri,
+        type: 'image/jpeg',
+        name: 'selfie.jpg',
+      } as any;
+
+      // Usar validación simple
+      const validationResponse = await faceValidationAPI.validateSelfie(selfieFile);
       
-      const issues: string[] = [];
-      let confidence = 100;
+      console.log(`[LivenessCheck] 📊 Respuesta:`, validationResponse);
       
-      // Simular diferentes tipos de validaciones
-      const random = Math.random();
-      
-      if (random < 0.1) {
-        issues.push('No se detectó movimiento facial');
-        confidence -= 30;
+      if (!(validationResponse as any).success) {
+        throw new Error((validationResponse as any).error || 'Error validando selfie');
       }
-      
-      if (random < 0.15) {
-        issues.push('Calidad de imagen insuficiente');
-        confidence -= 20;
-      }
-      
-      if (random < 0.05) {
-        issues.push('Posible foto estática detectada');
-        confidence -= 40;
-      }
-      
-      if (random < 0.1) {
-        issues.push('Iluminación insuficiente');
-        confidence -= 15;
-      }
+
+      const validationData = (validationResponse as any).data;
       
       const result: LivenessResult = {
-        isValid: confidence >= 70,
-        confidence,
-        issues,
+        isValid: validationData.valid,
+        confidence: validationData.confidence,
+        issues: validationData.issues || [],
       };
       
+      console.log(`[LivenessCheck] ✅ Resultado:`, result);
       setLivenessResult(result);
       
       if (!result.isValid) {
         Alert.alert(
           'Verificación fallida',
-          `La verificación de vida no fue exitosa:\n\n• ${result.issues.join('\n• ')}\n\nPor favor, intenta de nuevo.`,
+          `La verificación no fue exitosa:\n\n• ${result.issues.join('\n• ')}\n\nPor favor, intenta de nuevo.`,
           [
             { text: 'Reintentar', onPress: () => retryLiveness() },
             { text: 'Cancelar', style: 'cancel' },
@@ -236,16 +268,28 @@ export const LivenessCheck: React.FC<LivenessCheckProps> = ({
       } else {
         Alert.alert(
           'Verificación exitosa',
-          'La verificación de vida fue completada correctamente.',
+          `La verificación fue completada correctamente.\nConfianza: ${result.confidence}%`,
           [{ text: 'Continuar', onPress: () => onSelfieCaptured(imageUri) }]
         );
       }
     } catch (error) {
-      Alert.alert('Error', 'Error al validar la selfie. Intenta de nuevo.');
+      const errorObj = error as Error;
+      console.error(`[LivenessCheck] 💥 Error:`, error);
+      
+      Alert.alert(
+        'Error de validación', 
+        `Error al validar la selfie. Intenta de nuevo.\n\nError: ${errorObj.message}`,
+        [
+          { text: 'Reintentar', onPress: () => retryLiveness() },
+          { text: 'Cancelar', style: 'cancel' },
+        ]
+      );
     } finally {
       setIsValidating(false);
+      setValidationProgress('');
     }
   };
+
 
   const retryLiveness = () => {
     setCurrentStep('instructions');
@@ -389,6 +433,9 @@ export const LivenessCheck: React.FC<LivenessCheckProps> = ({
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Validando selfie...</Text>
+          {validationProgress && (
+            <Text style={styles.progressText}>{validationProgress}</Text>
+          )}
         </View>
       )}
       
@@ -639,6 +686,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.md,
+  },
+  progressText: {
+    fontSize: 14,
+    color: theme.colors.primary,
+    marginTop: theme.spacing.sm,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   issuesContainer: {
     backgroundColor: theme.colors.error + '10',

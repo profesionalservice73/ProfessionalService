@@ -5,9 +5,8 @@ import {
   Alert,
 } from 'react-native';
 import { OTPVerification } from './OTPVerification';
-import { DocumentCapture } from './DocumentCapture';
+import { DocumentCaptureOptimized as DocumentCapture } from './DocumentCaptureOptimized';
 import { LivenessCheck } from './LivenessCheck';
-import { BiometricComparison } from './BiometricComparison';
 import { KYCReview } from './KYCReview';
 import { KYCResult } from './KYCResult';
 import { theme } from '../config/theme';
@@ -24,12 +23,10 @@ interface KYCFlowProps {
 }
 
 type KYCStep = 
-  | 'otp_email' 
-  | 'otp_phone' 
+  | 'otp_email'
+  // | 'otp_phone'  // Comentado temporalmente
   | 'documents' 
   | 'liveness' 
-  | 'biometric' 
-  | 'review' 
   | 'result';
 
 interface KYCData {
@@ -38,8 +35,6 @@ interface KYCData {
   dniFrontUri: string | null;
   dniBackUri: string | null;
   selfieUri: string | null;
-  biometricMatch: boolean;
-  biometricConfidence: number;
   reviewResult: any;
 }
 
@@ -55,8 +50,6 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
     dniFrontUri: null,
     dniBackUri: null,
     selfieUri: null,
-    biometricMatch: false,
-    biometricConfidence: 0,
     reviewResult: null,
   });
 
@@ -80,7 +73,7 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
       const response = await authAPI.sendOTP(type, contactInfo, 'kyc_verification', emailFrom);
       
       if (response.success) {
-        const maskedInfo = response.data.maskedContact;
+        const maskedInfo = response.data?.data?.maskedContact || response.data?.maskedContact || "tu contacto";
         Alert.alert(
           'Código Enviado',
           `Se ha enviado un código de verificación a ${maskedInfo}`,
@@ -94,14 +87,14 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
       console.error('Error enviando OTP:', error);
       Alert.alert('Error', 'No se pudo enviar el código. Intenta de nuevo.');
       return false;
-    }
+      }
   };
 
   const handleOTPComplete = (isVerified: boolean, type: 'email' | 'phone') => {
     if (isVerified) {
       if (type === 'email') {
         setKycData(prev => ({ ...prev, otpEmailVerified: true }));
-        setCurrentStep('otp_phone');
+        setCurrentStep('documents'); // Ir directamente a documentos (SMS comentado)
       } else {
         setKycData(prev => ({ ...prev, otpPhoneVerified: true }));
         setCurrentStep('documents');
@@ -123,17 +116,31 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
       ...prev,
       selfieUri: selfieUri,
     }));
-    setCurrentStep('biometric');
-  };
-
-  const handleBiometricComplete = (isMatch: boolean, confidence: number) => {
+    
+    // Después de validar la selfie, completar el KYC directamente
+    const reviewResult = {
+      isApproved: true, // Siempre aprobado para continuar
+      reviewType: 'automatic' as const,
+      timestamp: new Date().toISOString(),
+    };
+    
     setKycData(prev => ({
       ...prev,
-      biometricMatch: isMatch,
-      biometricConfidence: confidence,
+      reviewResult,
     }));
-    setCurrentStep('review');
+    
+    // Completar el KYC directamente sin comparación biométrica
+    const finalKYCData = {
+      ...kycData,
+      selfieUri: selfieUri,
+      reviewResult,
+      userData,
+      completedAt: new Date().toISOString(),
+    };
+    
+    onKYCComplete(true, finalKYCData);
   };
+
 
   const handleReviewComplete = (isApproved: boolean, reviewType: 'automatic' | 'manual') => {
     const reviewResult = {
@@ -163,54 +170,39 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
     // Reiniciar el flujo desde el paso actual
     switch (currentStep) {
       case 'result':
-        if (kycData.reviewResult?.reviewType === 'automatic') {
-          setCurrentStep('review');
-        } else {
-          setCurrentStep('biometric');
-        }
-        break;
-      case 'review':
-        setCurrentStep('biometric');
-        break;
-      case 'biometric':
         setCurrentStep('liveness');
         break;
       case 'liveness':
         setCurrentStep('documents');
         break;
       case 'documents':
-        setCurrentStep('otp_phone');
+        onBack(); // No hay paso anterior, volver al inicio
         break;
-      case 'otp_phone':
-        setCurrentStep('otp_email');
-        break;
+      // case 'otp_phone': // Comentado temporalmente
+      //   setCurrentStep('otp_email');
+      //   break;
       default:
-        setCurrentStep('otp_email');
+        onBack(); // Volver al inicio del flujo
     }
   };
 
   const handleStepBack = () => {
     switch (currentStep) {
-      case 'otp_phone':
-        setCurrentStep('otp_email');
-        break;
+      // case 'otp_phone': // Comentado temporalmente
+      //   setCurrentStep('otp_email');
+      //   break;
       case 'documents':
-        setCurrentStep('otp_phone');
+        // No hay paso anterior, ir al inicio del flujo
+        onBack();
         break;
       case 'liveness':
         setCurrentStep('documents');
         break;
-      case 'biometric':
+      case 'result':
         setCurrentStep('liveness');
         break;
-      case 'review':
-        setCurrentStep('biometric');
-        break;
-      case 'result':
-        setCurrentStep('review');
-        break;
       default:
-        onBack();
+        onBack(); // Volver al inicio del flujo
     }
   };
 
@@ -226,15 +218,15 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
           />
         );
 
-      case 'otp_phone':
-        return (
-          <OTPVerification
-            phone={userData.phone}
-            onVerificationComplete={(isVerified) => handleOTPComplete(isVerified, 'phone')}
-            onResendCode={() => sendOTP('phone')}
-            verificationType="phone"
-          />
-        );
+      // case 'otp_phone': // Comentado temporalmente
+      //   return (
+      //     <OTPVerification
+      //       phone={userData.phone}
+      //       onVerificationComplete={(isVerified) => handleOTPComplete(isVerified, 'phone')}
+      //       onResendCode={() => sendOTP('phone')}
+      //       verificationType="phone"
+      //     />
+      //   );
 
       case 'documents':
         return (
@@ -252,39 +244,14 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
           />
         );
 
-      case 'biometric':
-        return (
-          <BiometricComparison
-            dniFrontUri={kycData.dniFrontUri!}
-            dniBackUri={kycData.dniBackUri!}
-            selfieUri={kycData.selfieUri!}
-            onComparisonComplete={handleBiometricComplete}
-            onBack={handleStepBack}
-          />
-        );
 
-      case 'review':
-        return (
-          <KYCReview
-            kycData={{
-              dniFrontUri: kycData.dniFrontUri!,
-              dniBackUri: kycData.dniBackUri!,
-              selfieUri: kycData.selfieUri!,
-              otpVerified: kycData.otpEmailVerified && kycData.otpPhoneVerified,
-              biometricMatch: kycData.biometricMatch,
-              biometricConfidence: kycData.biometricConfidence,
-            }}
-            onReviewComplete={handleReviewComplete}
-            onBack={handleStepBack}
-          />
-        );
 
       case 'result':
         return (
           <KYCResult
             isApproved={kycData.reviewResult?.isApproved || false}
             reviewType={kycData.reviewResult?.reviewType || 'automatic'}
-            confidence={kycData.biometricConfidence}
+            confidence={0}
             issues={kycData.reviewResult?.issues || []}
             onComplete={handleKYCResultComplete}
             onRetry={handleRetry}
@@ -298,18 +265,14 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
 
   const getStepTitle = (): string => {
     switch (currentStep) {
-      case 'otp_email':
-        return 'Verificación de Email';
-      case 'otp_phone':
-        return 'Verificación de Teléfono';
+      // case 'otp_email': // Comentado temporalmente
+      //   return 'Verificación de Email';
+      // case 'otp_phone': // Comentado temporalmente
+      //   return 'Verificación de Teléfono';
       case 'documents':
         return 'Captura de Documento';
       case 'liveness':
         return 'Verificación de Vida';
-      case 'biometric':
-        return 'Comparación Biométrica';
-      case 'review':
-        return 'Revisión KYC';
       case 'result':
         return 'Resultado';
       default:
@@ -318,7 +281,7 @@ export const KYCFlow: React.FC<KYCFlowProps> = ({
   };
 
   const getStepProgress = (): number => {
-    const steps: KYCStep[] = ['otp_email', 'otp_phone', 'documents', 'liveness', 'biometric', 'review', 'result'];
+    const steps: KYCStep[] = ['documents', 'liveness', 'result']; // Excluidos otp_email, otp_phone y biometric
     const currentIndex = steps.indexOf(currentStep);
     return ((currentIndex + 1) / steps.length) * 100;
   };

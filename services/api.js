@@ -1,7 +1,9 @@
 import { Alert } from "react-native";
 
 // Configuración de la API - IMPORTANTE: Cambiar por tu IP local
-const API_BASE_URL = "http://192.168.0.78:3000/api/v1"; // 'https://api-professional-service.vercel.app/api/v1';
+const API_BASE_URL = "http://192.168.0.94:3000/api/v1" //  'https://api-professional-service.onrender.com/api/v1';
+// "http://192.168.0.94:3000/api/v1";
+
 
 // Clase para manejar las respuestas de la API
 class ApiResponse {
@@ -17,47 +19,26 @@ class ApiResponse {
 const apiRequest = async (endpoint, options = {}) => {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
-    console.log(`[API] Making request to: ${url}`);
-
-    const defaultOptions = {
+    const config = {
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
-        ...options.headers,
       },
+      ...options,
     };
 
-    const response = await fetch(url, {
-      ...defaultOptions,
-      ...options,
-    });
-
-    console.log(`[API] Response status: ${response.status}`);
-
-    const result = await response.json();
-    console.log(`[API] Response data:`, result);
+    console.log(`[API] ${config.method} ${url}`);
+    
+    const response = await fetch(url, config);
+    const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.error || "Error en la petición");
+      throw new Error(data.error || `HTTP error! status: ${response.status}`);
     }
 
-    return new ApiResponse(
-      result.success,
-      result.data,
-      result.message,
-      result.error
-    );
+    return new ApiResponse(true, data, data.message, null);
   } catch (error) {
-    console.error("API Error:", error);
-
-    // Solo mostrar alerta si no es un error de red (para evitar spam de alertas)
-    if (error.name !== "TypeError" || !error.message.includes("fetch")) {
-      Alert.alert(
-        "Error de Conexión",
-        error.message || "No se pudo conectar con el servidor",
-        [{ text: "OK" }]
-      );
-    }
-
+    console.error(`[API] Error en ${endpoint}:`, error);
     return new ApiResponse(false, null, null, error.message);
   }
 };
@@ -148,55 +129,19 @@ export const clientAPI = {
       method: "DELETE",
     });
   },
-
-  // Actualizar solicitud completa
-  updateRequest: async (requestId, requestData) => {
-    return await apiRequest(`/client/requests/${requestId}`, {
-      method: "PUT",
-      body: JSON.stringify(requestData),
-    });
-  },
-
-  // Obtener favoritos
-  getFavorites: async (clientId) => {
-    return await apiRequest(`/client/favorites?clientId=${clientId}`);
-  },
-
-  // Agregar a favoritos
-  addToFavorites: async (clientId, professionalId) => {
-    return await apiRequest(`/client/favorites/${professionalId}`, {
-      method: "POST",
-      body: JSON.stringify({ clientId }),
-    });
-  },
-
-  // Remover de favoritos
-  removeFromFavorites: async (clientId, professionalId) => {
-    return await apiRequest(
-      `/client/favorites/${professionalId}?clientId=${clientId}`,
-      {
-        method: "DELETE",
-      }
-    );
-  },
-
-  // Obtener perfil del cliente
-  getProfile: async (clientId) => {
-    return await apiRequest(`/client/profile?clientId=${clientId}`);
-  },
-
-  // Actualizar perfil del cliente
-  updateProfile: async (clientId, profileData) => {
-    return await apiRequest("/client/profile", {
-      method: "PUT",
-      body: JSON.stringify({ clientId, ...profileData }),
-    });
-  },
 };
 
 // ===== PROFESIONAL =====
 
 export const professionalAPI = {
+  // Registrar perfil profesional
+  register: async (professionalData) => {
+    return await apiRequest('/professional/register', {
+      method: 'POST',
+      body: JSON.stringify(professionalData),
+    });
+  },
+
   // Obtener dashboard del profesional
   getHome: async (professionalId) => {
     return await apiRequest(
@@ -283,214 +228,140 @@ export const professionalAPI = {
       method: "GET",
     });
   },
-
-  // Obtener dashboard del profesional
-  getHome: async (professionalId) => {
-    return await apiRequest(
-      `/professional/home?professionalId=${professionalId}`,
-      {
-        method: "GET",
-      }
-    );
-  },
-
-  // Aceptar una solicitud
-  acceptRequest: async (requestId, professionalId) => {
-    return await apiRequest(`/professional/requests/${requestId}/accept`, {
-      method: "POST",
-      body: JSON.stringify({ professionalId }),
-    });
-  },
-
-  // Completar registro profesional
-  completeRegistration: async (registrationData, userId) => {
-    return await apiRequest("/professional/register", {
-      method: "POST",
-      body: JSON.stringify({
-        ...registrationData,
-        userId,
-      }),
-    });
-  },
-
-  // Actualizar perfil del profesional
-  updateProfile: async (profileData) => {
-    return await apiRequest("/professional/profile", {
-      method: "PUT",
-      body: JSON.stringify(profileData),
-    });
-  },
-
-  // Actualizar disponibilidad
-  updateAvailability: async (professionalId, availability) => {
-    return await apiRequest("/professional/availability", {
-      method: "PUT",
-      body: JSON.stringify({ professionalId, availability }),
-    });
-  },
-};
-
-// ===== BÚSQUEDA =====
-
-export const searchAPI = {
-  // Buscar profesionales
-  searchProfessionals: async (filters = {}) => {
-    const params = new URLSearchParams(filters);
-    return await apiRequest(`/search/professionals?${params}`);
-  },
-
-  // Buscar servicios
-  searchServices: async (category) => {
-    const params = category ? `?category=${category}` : "";
-    return await apiRequest(`/search/services${params}`);
-  },
-};
-
-// Agregar funciones de búsqueda al clientAPI
-clientAPI.searchProfessionals = async (searchQuery) => {
-  return await apiRequest(
-    `/search/professionals?query=${encodeURIComponent(searchQuery)}`
-  );
-};
-
-clientAPI.searchProfessionalsByCategory = async (categoryId) => {
-  return await apiRequest(`/search/professionals?category=${categoryId}`);
-};
-
-// ===== RESEÑAS =====
-
-export const reviewsAPI = {
-  // Crear reseña
-  createReview: async (reviewData) => {
-    return await apiRequest("/reviews", {
-      method: "POST",
-      body: JSON.stringify(reviewData),
-    });
-  },
-
-  // Obtener reseñas de un profesional
-  getProfessionalReviews: async (professionalId) => {
-    return await apiRequest(`/reviews/${professionalId}`);
-  },
-
-  // Actualizar reseña
-  updateReview: async (reviewId, reviewData) => {
-    return await apiRequest(`/reviews/${reviewId}`, {
-      method: "PUT",
-      body: JSON.stringify(reviewData),
-    });
-  },
 };
 
 // ===== VALIDACIÓN DE DOCUMENTOS =====
 
 export const documentAPI = {
   /**
-   * Valida el frente del DNI usando OCR (NUEVO)
-   * @param {File} imageFile - Archivo de imagen del frente
-   * @returns {Promise<Object>} Resultado de la validación
-   */
-  validateDNIFront: async (imageFile) => {
-    const formData = new FormData();
-    formData.append("dniFront", imageFile);
-
-    return await fetch(`${API_BASE_URL}/validate-dni-front`, {
-      method: "POST",
-      body: formData,
-    }).then((res) => res.json());
-  },
-
-  /**
-   * Valida el dorso del DNI usando OCR (NUEVO)
-   * @param {File} imageFile - Archivo de imagen del dorso
-   * @returns {Promise<Object>} Resultado de la validación
-   */
-  validateDNIBack: async (imageFile) => {
-    const formData = new FormData();
-    formData.append("dniBack", imageFile);
-
-    return await fetch(`${API_BASE_URL}/validate-dni-back`, {
-      method: "POST",
-      body: formData,
-    }).then((res) => res.json());
-  },
-
-  /**
-   * Valida DNI combinado (frente + dorso)
-   * @param {Object} frontData - Datos del frente
-   * @param {Object} backData - Datos del dorso
-   * @returns {Promise<Object>} Resultado de la validación
-   */
-  validateDNICombined: async (frontData, backData) => {
-    return await apiRequest("/validate-dni", {
-      method: "POST",
-      body: JSON.stringify({ front: frontData, back: backData }),
-    });
-  },
-
-  /**
-   * Valida un documento DNI usando base64 (COMPATIBILIDAD)
+   * Valida un DNI usando OCR
    * @param {string} imageBase64 - Imagen en base64
-   * @param {string} type - 'front' o 'back'
+   * @param {string} type - Tipo de documento ('front' o 'back')
    * @returns {Promise<Object>} Resultado de la validación
    */
   validateDNI: async (imageBase64, type) => {
+    const startTime = Date.now();
+    console.log(`[documentAPI] 🚀 Iniciando validación REAL de DNI ${type} con OCR`);
+    
     try {
-      // Crear FormData con la imagen en base64
-      const formData = new FormData();
-
-      // Crear objeto de archivo compatible con React Native
-      const imageData = {
-        uri: `data:image/jpeg;base64,${imageBase64}`,
-        type: "image/jpeg",
-        name: "dni.jpg",
-      };
-
-      // Agregar al FormData según el tipo
-      if (type === "front") {
-        formData.append("dniFront", imageData);
-      } else {
-        formData.append("dniBack", imageData);
+      // Verificar que la imagen existe
+      if (!imageBase64 || imageBase64.length < 100) {
+        return {
+          valid: false,
+          message: "Imagen no válida o muy pequeña"
+        };
       }
 
-      // Llamar al endpoint correspondiente
-      const endpoint =
-        type === "front" ? "/validate-dni-front" : "/validate-dni-back";
-
-      return await fetch(`${API_BASE_URL}${endpoint}`, {
+      console.log(`[documentAPI] 📤 Enviando imagen base64 al backend para OCR real...`);
+      
+      const response = await fetch(`${API_BASE_URL}/validate-dni-${type}-base64`, {
         method: "POST",
-        body: formData,
         headers: {
-          "Content-Type": "multipart/form-data",
+          "Content-Type": "application/json",
         },
-      }).then((res) => res.json());
+        body: JSON.stringify({ image: imageBase64 }),
+      });
+
+      const totalTime = Date.now() - startTime;
+      console.log(`[documentAPI] ⏰ Validación OCR completada en ${totalTime}ms`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`[documentAPI] 📊 Resultado REAL de OCR:`, result);
+      
+      return result;
     } catch (error) {
-      console.error("[documentAPI] Error en validateDNI:", error);
+      const totalTime = Date.now() - startTime;
+      console.error(`[documentAPI] 💥 Error en validación REAL después de ${totalTime}ms:`, error);
+      
       return {
         valid: false,
-        message: "Error al procesar la imagen",
+        message: "Error al validar el documento con OCR",
         error: error.message,
+        processingTime: totalTime
       };
     }
   },
 
   /**
-   * Verifica el estado del servicio de validación
+   * Obtiene el estado de validación
    * @returns {Promise<Object>} Estado del servicio
    */
   getValidationStatus: async () => {
-    return await apiRequest("/validate-dni/status", {
-      method: "GET",
-    });
-  },
+    try {
+      const response = await fetch(`${API_BASE_URL}/dni-validation/health`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error(`[documentAPI] Error obteniendo estado:`, error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 };
 
-// Exportar todas las APIs
-export default {
-  auth: authAPI,
-  client: clientAPI,
-  professional: professionalAPI,
-  search: searchAPI,
-  reviews: reviewsAPI,
-  document: documentAPI,
+// ===== VALIDACIÓN FACIAL =====
+
+export const faceValidationAPI = {
+  /**
+   * Valida una selfie
+   * @param {File} selfieFile - Archivo de imagen de la selfie
+   * @returns {Promise<Object>} Resultado de la validación
+   */
+  validateSelfie: async (selfieFile) => {
+    const startTime = Date.now();
+    console.log(`[faceValidationAPI] 🚀 Iniciando validación REAL de selfie`);
+    
+    try {
+      // Verificar que el archivo existe
+      if (!selfieFile) {
+        return {
+          success: false,
+          error: "No se proporcionó archivo de selfie"
+        };
+      }
+
+      console.log(`[faceValidationAPI] 📤 Enviando selfie al backend para validación real...`);
+      
+      const formData = new FormData();
+      formData.append("selfie", selfieFile);
+
+      const response = await fetch(`${API_BASE_URL}/face-validation-prod/validate-selfie`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const totalTime = Date.now() - startTime;
+      console.log(`[faceValidationAPI] ⏰ Validación completada en ${totalTime}ms`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log(`[faceValidationAPI] 📊 Resultado REAL de validación:`, result);
+      
+      return result;
+    } catch (error) {
+      const totalTime = Date.now() - startTime;
+      console.error(`[faceValidationAPI] 💥 Error en validación REAL después de ${totalTime}ms:`, error);
+      
+      return {
+        success: false,
+        error: error.message,
+        processingTime: totalTime
+      };
+    }
+  },
+
 };

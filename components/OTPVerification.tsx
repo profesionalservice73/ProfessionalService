@@ -59,7 +59,7 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
       const response = await authAPI.sendOTP(verificationType, contactInfo, purpose, emailFrom);
       
       if (response.success) {
-        const maskedInfo = response.data.maskedContact;
+        const maskedInfo = response.data?.data?.maskedContact || response.data?.maskedContact || "tu contacto";
         Alert.alert(
           "Código Enviado",
           `Se ha enviado un código de verificación a ${maskedInfo}`,

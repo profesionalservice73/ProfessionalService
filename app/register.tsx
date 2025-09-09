@@ -25,9 +25,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { Header } from "../components/Header";
 import { EnhancedServiceIcon } from "../components/EnhancedServiceIcon";
 import { useProfessional } from "../contexts/ProfessionalContext";
-import { professionalAPI } from "../services/api";
+import { professionalAPI, authAPI } from "../services/api";
 import { ImageValidationService } from "../services/imageValidation";
 import { KYCFlow } from "../components/KYCFlow";
+import { CountryPhoneInput } from "../components/CountryPhoneInput";
 
 // Datos para el formulario de profesionales
 const categories = [
@@ -103,6 +104,12 @@ export default function RegisterScreen({ navigation }: any) {
     password: "",
     confirmPassword: "",
   });
+  const [clientSelectedCountry, setClientSelectedCountry] = useState({
+    code: "AR",
+    name: "Argentina",
+    dialCode: "+54",
+    flag: "🇦🇷",
+  });
 
   // Estados para el formulario de profesional
   const [professionalFormData, setProfessionalFormData] = useState({
@@ -134,6 +141,12 @@ export default function RegisterScreen({ navigation }: any) {
     emergencyPhone: "",
     // Foto de perfil
     profilePhoto: null as string | null,
+  });
+  const [professionalSelectedCountry, setProfessionalSelectedCountry] = useState({
+    code: "AR",
+    name: "Argentina",
+    dialCode: "+54",
+    flag: "🇦🇷",
   });
 
   // Estados para imágenes de profesional
@@ -747,9 +760,13 @@ export default function RegisterScreen({ navigation }: any) {
     return emailRegex.test(email);
   };
 
-  const validatePhone = (phone: string) => {
-    const phoneRegex = /^\+?[\d\s-]{10,}$/;
-    return phoneRegex.test(phone);
+  const validatePhone = (phone: string, countryCode: string) => {
+    // Remover espacios y caracteres especiales
+    const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+    
+    // Validar que sea solo números y tenga al menos 7 dígitos
+    const phoneRegex = /^\d{7,15}$/;
+    return phoneRegex.test(cleanPhone);
   };
 
   const validateClientForm = () => {
@@ -767,7 +784,7 @@ export default function RegisterScreen({ navigation }: any) {
 
     if (!clientFormData.phone) {
       newErrors.phone = "El teléfono es requerido";
-    } else if (!validatePhone(clientFormData.phone)) {
+    } else if (!validatePhone(clientFormData.phone, clientSelectedCountry.code)) {
       newErrors.phone = "Teléfono inválido";
     }
 
@@ -795,7 +812,7 @@ export default function RegisterScreen({ navigation }: any) {
         newErrors.fullName = "El nombre completo es requerido";
       if (!professionalFormData.phone.trim())
         newErrors.phone = "El teléfono es requerido";
-      else if (!validatePhone(professionalFormData.phone))
+      else if (!validatePhone(professionalFormData.phone, professionalSelectedCountry.code))
         newErrors.phone = "Teléfono inválido";
       if (!professionalFormData.email.trim())
         newErrors.email = "El email es requerido";
@@ -858,6 +875,7 @@ export default function RegisterScreen({ navigation }: any) {
       try {
         const result = await register({
           ...clientFormData,
+          phone: `${clientSelectedCountry.dialCode}${clientFormData.phone}`,
           userType: "client",
         });
 
@@ -878,20 +896,36 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const handleProfessionalNext = () => {
-    if (validateProfessionalStep(currentStep)) {
+    console.log('🔄 handleProfessionalNext llamado');
+    console.log('📊 Estado actual:', {
+      currentStep,
+      kycCompleted,
+      professionalLoading
+    });
+    
+    const isValid = validateProfessionalStep(currentStep);
+    console.log('✅ Validación del paso:', isValid);
+    
+    if (isValid) {
       if (currentStep === 1) {
         // En el paso 1, después de validar datos básicos, iniciar KYC
         if (!kycCompleted) {
+          console.log('🔐 Iniciando KYC...');
           setShowKYCFlow(true);
           return;
         }
+        console.log('➡️ Avanzando al paso 2...');
         setCurrentStep(currentStep + 1);
       } else if (currentStep < 4) {
+        console.log(`➡️ Avanzando al paso ${currentStep + 1}...`);
         setCurrentStep(currentStep + 1);
       } else {
         // En el paso 4 (último), completar el registro
+        console.log('🚀 Paso 4: Iniciando handleProfessionalSubmit...');
         handleProfessionalSubmit();
       }
+    } else {
+      console.log('❌ Validación falló, no se puede continuar');
     }
   };
 
@@ -902,7 +936,18 @@ export default function RegisterScreen({ navigation }: any) {
   };
 
   const handleProfessionalSubmit = async () => {
-    if (validateProfessionalStep(currentStep)) {
+    console.log('🎯 handleProfessionalSubmit iniciado');
+    console.log('📊 Estado en handleProfessionalSubmit:', {
+      currentStep,
+      kycCompleted,
+      professionalLoading
+    });
+    
+    const isValid = validateProfessionalStep(currentStep);
+    console.log('✅ Validación en handleProfessionalSubmit:', isValid);
+    
+    if (isValid) {
+      console.log('🔄 Iniciando proceso de registro...');
       setProfessionalLoading(true);
       try {
         // Log para debugging
@@ -926,15 +971,48 @@ export default function RegisterScreen({ navigation }: any) {
           dniBack: !!verificationData.dniBack,
         });
 
-        // Registrar usuario y completar perfil profesional en una sola llamada
-        const registerResult = await register({
+        // Paso 1: Registrar usuario básico
+        console.log('🔵 Paso 1: Registrando usuario básico...');
+        console.log('📋 Datos del usuario:', {
           fullName: professionalFormData.fullName,
           email: professionalFormData.email,
-          phone: professionalFormData.phone,
+          phone: `${professionalSelectedCountry.dialCode}${professionalFormData.phone}`,
+          userType: "professional"
+        });
+
+        const userRegisterResult = await register({
+          fullName: professionalFormData.fullName,
+          email: professionalFormData.email,
+          phone: `${professionalSelectedCountry.dialCode}${professionalFormData.phone}`,
           password: professionalFormData.password,
           confirmPassword: professionalFormData.confirmPassword,
           userType: "professional",
-          // Datos del formulario profesional
+        });
+
+        console.log('📊 Resultado del registro de usuario:', userRegisterResult);
+        console.log('🔍 Estructura de datos recibida:', {
+          success: userRegisterResult.success,
+          data: userRegisterResult.data,
+          dataId: userRegisterResult.data?.id,
+          message: userRegisterResult.message
+        });
+
+        if (!userRegisterResult.success) {
+          console.error('❌ Error en registro de usuario:', userRegisterResult);
+          throw new Error(userRegisterResult.message || 'Error registrando usuario');
+        }
+
+        if (!userRegisterResult.data || !userRegisterResult.data.id) {
+          console.error('❌ Error: No se recibió el ID del usuario:', userRegisterResult);
+          throw new Error('No se recibió el ID del usuario registrado');
+        }
+
+        console.log('✅ Usuario registrado exitosamente, creando perfil profesional...');
+
+        // Paso 2: Crear perfil profesional
+        console.log('🟢 Paso 2: Creando perfil profesional...');
+        const professionalData = {
+          userId: userRegisterResult.data.id,
           specialties: professionalFormData.specialties,
           experience: professionalFormData.experience,
           description: professionalFormData.description,
@@ -952,14 +1030,27 @@ export default function RegisterScreen({ navigation }: any) {
           // Datos del KYC
           kycData: kycData,
           kycStatus: kycData?.reviewResult?.isApproved ? "approved" : "pending",
-        });
+        };
+
+        console.log('📋 Datos del perfil profesional:', professionalData);
+        console.log('🚀 Enviando datos del perfil profesional al backend...');
+        
+        const professionalRegisterResult = await professionalAPI.register(professionalData);
+        
+        console.log('📊 Resultado del registro profesional:', professionalRegisterResult);
+
+        if (!professionalRegisterResult.success) {
+          console.error('❌ Error en registro profesional:', professionalRegisterResult);
+          throw new Error(professionalRegisterResult.error || 'Error creando perfil profesional');
+        }
+
+        console.log('✅ Perfil profesional creado exitosamente');
+        const registerResult = { success: true, message: 'Registro completo exitoso' };
 
         if (registerResult.success) {
-          await loadProfessionalData();
-
           Alert.alert(
             "Registro Exitoso",
-            "Tu perfil profesional ha sido creado exitosamente. Los clientes podrán encontrarte y contactarte.",
+            "Tu perfil profesional ha sido creado exitosamente. Por favor, inicia sesión para continuar.",
             [
               {
                 text: "OK",
@@ -971,10 +1062,24 @@ export default function RegisterScreen({ navigation }: any) {
           Alert.alert("Error", registerResult.message);
         }
       } catch (error) {
-        Alert.alert("Error", "Error de conexión al completar el registro");
+        console.error('💥 Error completo en el registro:', error);
+        console.error('💥 Error message:', error.message);
+        console.error('💥 Error stack:', error.stack);
+        Alert.alert("Error", `Error de conexión al completar el registro: ${error.message}`);
       } finally {
         setProfessionalLoading(false);
       }
+    } else {
+      console.log('❌ Validación falló en handleProfessionalSubmit, no se puede continuar');
+      console.log('📋 Datos actuales del formulario:', {
+        fullName: professionalFormData.fullName,
+        email: professionalFormData.email,
+        phone: professionalFormData.phone,
+        specialties: professionalFormData.specialties,
+        experience: professionalFormData.experience,
+        description: professionalFormData.description,
+        location: professionalFormData.location
+      });
     }
   };
 
@@ -985,24 +1090,17 @@ export default function RegisterScreen({ navigation }: any) {
     setErrors({});
   };
 
-  const handleKYCComplete = (isApproved: boolean, kycData: any) => {
+  const handleKYCComplete = async (isApproved: boolean, kycData: any) => {
+    console.log('🎯 handleKYCComplete llamado con:', { isApproved, kycData });
+    
     setKycCompleted(true);
     setKycData(kycData);
     setShowKYCFlow(false);
 
-    if (isApproved) {
-      Alert.alert(
-        "KYC Aprobado",
-        "Tu verificación de identidad ha sido completada exitosamente. Ahora puedes continuar con el registro.",
-        [{ text: "Continuar" }]
-      );
-    } else {
-      Alert.alert(
-        "KYC Pendiente",
-        "Tu verificación está siendo revisada. Puedes continuar con el registro y te notificaremos cuando esté lista.",
-        [{ text: "Continuar" }]
-      );
-    }
+    // NO registrar al usuario aquí, solo guardar los datos del KYC y continuar al paso 2
+    console.log('✅ KYC completado, continuando al paso 2 del registro...');
+    setCurrentStep(2);
+    console.log('📱 currentStep establecido a 2');
   };
 
   const handleKYCBack = () => {
@@ -1208,12 +1306,13 @@ export default function RegisterScreen({ navigation }: any) {
               error={errors.email}
             />
 
-            <Input
+            <CountryPhoneInput
               label="Teléfono"
-              placeholder="+1 234 567 8900"
+              placeholder="Ingresa tu número"
               value={clientFormData.phone}
               onChangeText={(value) => updateClientFormData("phone", value)}
-              keyboardType="phone-pad"
+              onCountryChange={setClientSelectedCountry}
+              selectedCountry={clientSelectedCountry}
               error={errors.phone}
             />
 
@@ -1381,12 +1480,13 @@ export default function RegisterScreen({ navigation }: any) {
         error={errors.email}
       />
 
-      <Input
+      <CountryPhoneInput
         label="Teléfono"
-        placeholder="+1 234 567 8900"
+        placeholder="Ingresa tu número"
         value={professionalFormData.phone}
         onChangeText={(value) => updateProfessionalFormData("phone", value)}
-        keyboardType="phone-pad"
+        onCountryChange={setProfessionalSelectedCountry}
+        selectedCountry={professionalSelectedCountry}
         error={errors.phone}
       />
 
@@ -2352,7 +2452,7 @@ export default function RegisterScreen({ navigation }: any) {
         userData={{
           fullName: professionalFormData.fullName,
           email: professionalFormData.email,
-          phone: professionalFormData.phone,
+          phone: `${professionalSelectedCountry.dialCode}${professionalFormData.phone}`,
         }}
         onKYCComplete={handleKYCComplete}
         onBack={handleKYCBack}

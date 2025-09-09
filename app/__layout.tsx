@@ -21,6 +21,7 @@ import ProfessionalDetailScreen from './client/professional-detail';
 import CreateRequestScreen from './client/create-request';
 import EditRequestScreen from './client/edit-request';
 import ProfessionalLayout from './professional/__layout';
+import ProfessionalRegisterScreen from './professional/register';
 import EditProfileScreen from './professional/edit-profile';
 import RequestDetailScreen from './professional/request-detail';
 import ReviewsScreen from './client/reviews';
@@ -139,7 +140,6 @@ const RootNavigator = () => {
         user?.userType === 'professional' ? (
           <>
             <Stack.Screen name="ProfessionalMain" component={ProfessionalLayout} />
-
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
           </>

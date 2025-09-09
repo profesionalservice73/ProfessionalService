@@ -237,7 +237,11 @@ export const KYCReview: React.FC<KYCReviewProps> = ({
     if (!reviewResult) return null;
 
     return (
-      <ScrollView style={styles.stepContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollContainer} 
+        contentContainerStyle={styles.stepContainer}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[
           styles.resultIcon,
           reviewResult.isApproved ? styles.resultIconSuccess : styles.resultIconWarning
@@ -437,10 +441,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: theme.spacing.lg,
   },
-  stepContainer: {
+  scrollContainer: {
     flex: 1,
+  },
+  stepContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: theme.spacing.lg,
   },
   processingIcon: {
     width: 120,
