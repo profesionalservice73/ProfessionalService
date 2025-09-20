@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import { Header } from '../../components/Header';
 import { useProfessional } from '../../contexts/ProfessionalContext';
+import { useProfessionalNotifications } from '../../hooks/useProfessionalNotifications';
 import { professionalAPI } from '../../services/api';
 import { RequestCard } from '../../components/RequestCard';
 
@@ -41,7 +42,13 @@ const getStatusColor = (status: string) => {
       return theme.colors.warning;
     case 'accepted':
       return theme.colors.primary;
+    case 'in_progress':
+      return theme.colors.primary;
     case 'completed':
+      return theme.colors.success;
+    case 'awaiting_rating':
+      return theme.colors.primary;
+    case 'closed':
       return theme.colors.success;
     case 'cancelled':
       return theme.colors.error;
@@ -56,8 +63,14 @@ const getStatusText = (status: string) => {
       return 'Pendiente';
     case 'accepted':
       return 'Aceptada';
+    case 'in_progress':
+      return 'En Progreso';
     case 'completed':
       return 'Completada';
+    case 'awaiting_rating':
+      return 'Esperando Calificación';
+    case 'closed':
+      return 'Cerrada';
     case 'cancelled':
       return 'Cancelada';
     default:
@@ -95,6 +108,7 @@ const getUrgencyText = (urgency: string) => {
 
 export default function ProfessionalRequestsScreen({ navigation }: any) {
   const { professional } = useProfessional();
+  const { markAsRead } = useProfessionalNotifications();
   const [activeFilter, setActiveFilter] = useState('all');
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,21 +116,28 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
   // Cargar solicitudes del profesional
   useEffect(() => {
     loadRequests();
+    // Limpiar notificaciones cuando el profesional ve las solicitudes
+    markAsRead();
   }, [activeFilter]);
 
   const loadRequests = async () => {
     if (!professional?.id) {
+      console.log('🔍 ProfessionalRequestsScreen - No professional ID available');
       setLoading(false);
       return;
     }
 
     try {
+      console.log('🔍 ProfessionalRequestsScreen - Loading requests for professional:', professional.id);
+      console.log('🔍 ProfessionalRequestsScreen - Active filter:', activeFilter);
       setLoading(true);
       let response;
 
       switch (activeFilter) {
         case 'pending':
+          console.log('🔍 ProfessionalRequestsScreen - Calling getPendingRequests...');
           response = await professionalAPI.getPendingRequests(professional.id);
+          console.log('🔍 ProfessionalRequestsScreen - Pending requests response:', response);
           break;
         case 'accepted':
           response = await professionalAPI.getAcceptedRequests(professional.id);
@@ -155,9 +176,7 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
     ? requests
     : activeFilter === 'accepted'
       ? requests.filter(request => request.status === 'accepted' || request.status === 'in_progress')
-      : activeFilter === 'cancelled'
-        ? requests.filter(request => request.status === 'cancelled')
-        : requests.filter(request => request.status === activeFilter);
+      : requests.filter(request => request.status === activeFilter);
 
   const handleRequestPress = (requestId: string) => {
     const request = requests.find(req => req._id === requestId || req.id === requestId);
@@ -218,14 +237,19 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
     { key: 'all', label: 'Todas' },
     { key: 'pending', label: 'Pendientes' },
     { key: 'accepted', label: 'Aceptadas' },
-    { key: 'completed', label: 'Completadas' },
+    { key: 'awaiting_rating', label: 'Esperando Calificación' },
+    { key: 'closed', label: 'Cerradas' },
     { key: 'cancelled', label: 'Canceladas' },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header con logo */}
-      <Header title="Mis Solicitudes" />
+      <Header title="Mis Solicitudes"    
+        rightAction={{
+          icon: 'settings-outline',
+          onPress: () => navigation.navigate('Settings')
+        }} />
 
       {/* Filters */}
       <View style={styles.filtersContainer}>

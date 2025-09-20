@@ -3,8 +3,8 @@ import { Platform } from 'react-native';
 export const MAPS_CONFIG = {
   // Configuración por defecto del mapa
   defaultRegion: {
-    latitude: 4.711, // Bogotá, Colombia
-    longitude: -74.0721,
+    latitude: 0, // Coordenadas neutras por defecto
+    longitude: 0,
     latitudeDelta: 0.01,
     longitudeDelta: 0.01,
   },

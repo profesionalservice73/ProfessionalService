@@ -2,9 +2,15 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   ProfessionalMain: undefined;
-  ProfessionalRegister: undefined;
+  AdminDashboard: undefined;
   ProfessionalRegisterSteps: undefined;
   EditProfile: undefined;
+  Settings: undefined;
+  CustomerSupport: undefined;
+  About: undefined;
+  ClientSettings: undefined;
+  ClientAbout: undefined;
+  ClientCustomerSupport: undefined;
   CategoryDetail: { categoryId: string };
   ProfessionalDetail: { id: string };
   CreateRequest: undefined;
@@ -18,6 +24,8 @@ export type RootStackParamList = {
 export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
+  ForgotPassword: undefined;
+  ResetPassword: { email: string; maskedContact: string };
 };
 
 export type MainTabParamList = {

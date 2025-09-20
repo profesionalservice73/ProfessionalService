@@ -25,68 +25,109 @@ export const AuthProvider = ({ children }) => {
 
   const loadUserFromStorage = async () => {
     try {
+      console.log('🔍 AuthContext - Iniciando carga de usuario desde storage...');
+      
       const storedUser = await AsyncStorage.getItem('user');
       const storedSessionId = await AsyncStorage.getItem('sessionId');
       
-      console.log('AuthContext - Stored user:', storedUser);
-      console.log('AuthContext - Stored session ID:', storedSessionId);
+      console.log('🔍 AuthContext - Stored user:', storedUser);
+      console.log('🔍 AuthContext - Stored session ID:', storedSessionId);
       
       if (storedUser && storedSessionId) {
         const userData = JSON.parse(storedUser);
-        console.log('AuthContext - Parsed user data:', userData);
+        console.log('🔍 AuthContext - Parsed user data:', userData);
         
-        // Validar si la sesión sigue siendo válida
-        const sessionValidation = await sessionService.validateSession(storedSessionId);
-        console.log('AuthContext - Session validation result:', sessionValidation);
+        // Crear timeout para validación de sesión
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Timeout: La validación de sesión tardó demasiado')), 8000); // 8 segundos
+        });
         
-        if (sessionValidation.valid) {
-          setUser(userData);
-          setSessionId(storedSessionId);
-          console.log('AuthContext - Usuario autenticado cargado:', userData);
+        try {
+          // Validar si la sesión sigue siendo válida con timeout
+          const sessionValidationPromise = sessionService.validateSession(storedSessionId);
+          const sessionValidation = await Promise.race([sessionValidationPromise, timeoutPromise]);
           
-          // Si es un profesional, verificar si necesita completar registro
-          if (userData.userType === 'professional') {
-            console.log('AuthContext - Usuario profesional detectado, verificando perfil...');
+          console.log('🔍 AuthContext - Session validation result:', sessionValidation);
+          
+          if (sessionValidation.valid) {
+            setUser(userData);
+            setSessionId(storedSessionId);
+            console.log('✅ AuthContext - Usuario autenticado cargado:', userData);
+            
+            // Si es un profesional, verificar si necesita completar registro
+            if (userData.userType === 'professional') {
+              console.log('🔍 AuthContext - Usuario profesional detectado, verificando perfil...');
+            }
+          } else {
+            // Sesión inválida, limpiar datos
+            console.log('❌ AuthContext - Session invalid, clearing data');
+            await logout();
           }
-        } else {
-          // Sesión inválida, limpiar datos
-          console.log('AuthContext - Session invalid, clearing data');
+        } catch (sessionError) {
+          console.error('❌ AuthContext - Error validando sesión:', sessionError);
+          // En caso de error de validación, asumir sesión inválida
           await logout();
         }
       } else {
-        console.log('AuthContext - No stored user or session found');
+        console.log('🔍 AuthContext - No stored user or session found');
       }
     } catch (error) {
-      console.error('AuthContext - Error loading user from storage:', error);
+      console.error('❌ AuthContext - Error loading user from storage:', error);
     } finally {
+      console.log('🔍 AuthContext - Finalizando carga, estableciendo loading: false');
       setLoading(false);
     }
   };
 
   const login = async (email, password) => {
     try {
+      console.log('🔍 AuthContext - Iniciando proceso de login...');
       setLoading(true);
-      const response = await authAPI.login(email, password);
       
-      if (response.success) {
-        const { user: userData, sessionId: newSessionId } = response.data;
+      // Crear timeout para login
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout: El login tardó demasiado')), 15000); // 15 segundos
+      });
+      
+      // Hacer login con timeout
+      const loginPromise = authAPI.login(email, password);
+      const response = await Promise.race([loginPromise, timeoutPromise]);
+      
+      console.log('🔍 AuthContext - Login response:', response);
+      
+      if (response.success && response.data) {
+        // El backend devuelve los datos anidados en response.data.data
+        const actualData = response.data.data || response.data;
+        const { user: userData, sessionId: newSessionId } = actualData;
         
-        // Guardar en estado
-        setUser(userData);
-        setSessionId(newSessionId);
+        console.log('🔍 AuthContext - User data:', userData);
+        console.log('🔍 AuthContext - Session ID:', newSessionId);
         
-        // Guardar en AsyncStorage
-        await AsyncStorage.setItem('user', JSON.stringify(userData));
-        await AsyncStorage.setItem('sessionId', newSessionId);
-        
-        return { success: true, message: response.message };
+        // Validar que los datos no sean undefined antes de guardar
+        if (userData && newSessionId) {
+          // Guardar en estado
+          setUser(userData);
+          setSessionId(newSessionId);
+          
+          // Guardar en AsyncStorage
+          await AsyncStorage.setItem('user', JSON.stringify(userData));
+          await AsyncStorage.setItem('sessionId', newSessionId);
+          
+          console.log('✅ AuthContext - Login exitoso, datos guardados');
+          return { success: true, message: response.message };
+        } else {
+          console.error('❌ AuthContext - Datos de usuario o sessionId son undefined');
+          return { success: false, message: 'Error: Datos de usuario incompletos' };
+        }
       } else {
-        return { success: false, message: response.error };
+        console.error('❌ AuthContext - Login falló:', response.error);
+        return { success: false, message: response.error || 'Error al iniciar sesión' };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ AuthContext - Login error:', error);
       return { success: false, message: 'Error al iniciar sesión' };
     } finally {
+      console.log('🔍 AuthContext - Finalizando login, estableciendo loading: false');
       setLoading(false);
     }
   };
@@ -185,8 +226,13 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = async (userData) => {
     try {
-      setUser(userData);
-      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      if (userData) {
+        setUser(userData);
+        await AsyncStorage.setItem('user', JSON.stringify(userData));
+        console.log('AuthContext - Usuario actualizado exitosamente');
+      } else {
+        console.error('AuthContext - Error: userData es undefined en updateUser');
+      }
     } catch (error) {
       console.error('Update user error:', error);
     }

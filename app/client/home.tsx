@@ -6,14 +6,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  SafeAreaView,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../config/theme';
-import { clientAPI } from '../../services/api';
 import { Header } from '../../components/Header';
+import { SafeScreen } from '../../components/SafeScreen';
 import { EnhancedServiceIcon } from '../../components/EnhancedServiceIcon';
 
 
@@ -76,10 +75,17 @@ export default function HomeScreen({ navigation }: any) {
 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeScreen>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header con logo */}
-        <Header title="Professional Service" />
+        <Header 
+          title="Professional Service" 
+          rightAction={{
+            icon: 'settings-outline',
+            onPress: () => navigation.navigate('ClientSettings')
+          }}
+          useSafeArea={false}
+        />
         
         {/* Header con búsqueda */}
         <LinearGradient
@@ -158,7 +164,7 @@ export default function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 

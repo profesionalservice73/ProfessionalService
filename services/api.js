@@ -1,7 +1,6 @@
-import { Alert } from "react-native";
 
 // Configuración de la API - IMPORTANTE: Cambiar por tu IP local
-const API_BASE_URL = "http://192.168.0.94:3000/api/v1" //  'https://api-professional-service.onrender.com/api/v1';
+const API_BASE_URL = "http://192.168.0.94:3000/api/v1" // "https://api-professional-service.vercel.app/api/v1" // 'https://apiprofessionalservice.onrender.com/api/v1';
 // "http://192.168.0.94:3000/api/v1";
 
 
@@ -28,12 +27,21 @@ const apiRequest = async (endpoint, options = {}) => {
     };
 
     console.log(`[API] ${config.method} ${url}`);
+    console.log(`[API] Request body:`, config.body);
     
     const response = await fetch(url, config);
     const data = await response.json();
 
+    console.log(`[API] Response status:`, response.status);
+    console.log(`[API] Response data:`, JSON.stringify(data, null, 2));
+
     if (!response.ok) {
       throw new Error(data.error || `HTTP error! status: ${response.status}`);
+    }
+
+    // Si el backend devuelve { success: true, data: [...] }, extraer solo el data
+    if (data.success && data.data !== undefined) {
+      return new ApiResponse(true, data.data, data.message, null);
     }
 
     return new ApiResponse(true, data, data.message, null);
@@ -56,10 +64,13 @@ export const authAPI = {
 
   // Iniciar sesión
   login: async (email, password) => {
-    return await apiRequest("/auth/login", {
+    console.log('[authAPI] Iniciando login para:', email);
+    const response = await apiRequest("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
+    console.log('[authAPI] Respuesta completa del login:', JSON.stringify(response, null, 2));
+    return response;
   },
 
   // Enviar código OTP
@@ -75,6 +86,22 @@ export const authAPI = {
     return await apiRequest("/auth/verify-otp", {
       method: "POST",
       body: JSON.stringify({ type, contact, code, purpose }),
+    });
+  },
+
+  // Verificar código OTP sin marcarlo como usado (para reset de contraseña)
+  checkOTP: async (type, contact, code, purpose) => {
+    return await apiRequest("/auth/check-otp", {
+      method: "POST",
+      body: JSON.stringify({ type, contact, code, purpose }),
+    });
+  },
+
+  // Restablecer contraseña
+  resetPassword: async (email, otpCode, newPassword) => {
+    return await apiRequest("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ email, otpCode, newPassword }),
     });
   },
 };
@@ -123,11 +150,66 @@ export const clientAPI = {
     });
   },
 
+  // Actualizar solicitud completa
+  updateRequestFull: async (requestId, requestData) => {
+    return await apiRequest(`/client/requests/${requestId}`, {
+      method: "PUT",
+      body: JSON.stringify(requestData),
+    });
+  },
+
   // Eliminar solicitud
   deleteRequest: async (requestId) => {
     return await apiRequest(`/client/requests/${requestId}`, {
       method: "DELETE",
     });
+  },
+
+  // Obtener favoritos del cliente
+  getFavorites: async (clientId) => {
+    return await apiRequest(`/client/favorites?clientId=${clientId}`);
+  },
+
+  // Agregar a favoritos
+  addToFavorites: async (clientId, professionalId) => {
+    return await apiRequest("/client/favorites", {
+      method: "POST",
+      body: JSON.stringify({ clientId, professionalId }),
+    });
+  },
+
+  // Eliminar de favoritos
+  removeFromFavorites: async (clientId, professionalId) => {
+    return await apiRequest("/client/favorites", {
+      method: "DELETE",
+      body: JSON.stringify({ clientId, professionalId }),
+    });
+  },
+
+  // Calificar solicitud completada
+  rateRequest: async (requestId, clientId, rating, comment) => {
+    return await apiRequest(`/client/requests/${requestId}/rate`, {
+      method: "POST",
+      body: JSON.stringify({ clientId, rating, comment }),
+    });
+  },
+
+  // Cancelar solicitud
+  cancelRequest: async (requestId, clientId, reason) => {
+    return await apiRequest(`/client/requests/${requestId}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ clientId, reason }),
+    });
+  },
+
+  // Obtener solicitudes activas
+  getActiveRequests: async (clientId) => {
+    return await apiRequest(`/client/requests/active?clientId=${clientId}`);
+  },
+
+  // Obtener conteo de notificaciones
+  getNotificationCount: async (clientId) => {
+    return await apiRequest(`/client/notifications/count?clientId=${clientId}`);
   },
 };
 
@@ -189,6 +271,11 @@ export const professionalAPI = {
     );
   },
 
+  // Obtener conteo de notificaciones del profesional
+  getNotificationCount: async (professionalId) => {
+    return await apiRequest(`/professional/notifications/count?professionalId=${professionalId}`);
+  },
+
   // Obtener solicitudes completadas del profesional
   getCompletedRequests: async (professionalId) => {
     return await apiRequest(
@@ -228,140 +315,172 @@ export const professionalAPI = {
       method: "GET",
     });
   },
+
+  // Aceptar solicitud
+  acceptRequest: async (requestId, professionalId) => {
+    return await apiRequest(`/professional/requests/${requestId}/accept`, {
+      method: "POST",
+      body: JSON.stringify({ professionalId }),
+    });
+  },
 };
 
-// ===== VALIDACIÓN DE DOCUMENTOS =====
+// ===== DOCUMENTOS (SIN VALIDACIONES) =====
 
 export const documentAPI = {
   /**
-   * Valida un DNI usando OCR
+   * Simula validación de DNI (sin OCR)
    * @param {string} imageBase64 - Imagen en base64
    * @param {string} type - Tipo de documento ('front' o 'back')
-   * @returns {Promise<Object>} Resultado de la validación
+   * @returns {Promise<Object>} Resultado simulado (siempre válido)
    */
   validateDNI: async (imageBase64, type) => {
-    const startTime = Date.now();
-    console.log(`[documentAPI] 🚀 Iniciando validación REAL de DNI ${type} con OCR`);
+    console.log(`[documentAPI] ✅ Imagen ${type} aceptada sin validación OCR`);
     
-    try {
-      // Verificar que la imagen existe
-      if (!imageBase64 || imageBase64.length < 100) {
-        return {
-          valid: false,
-          message: "Imagen no válida o muy pequeña"
-        };
-      }
-
-      console.log(`[documentAPI] 📤 Enviando imagen base64 al backend para OCR real...`);
-      
-      const response = await fetch(`${API_BASE_URL}/validate-dni-${type}-base64`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image: imageBase64 }),
-      });
-
-      const totalTime = Date.now() - startTime;
-      console.log(`[documentAPI] ⏰ Validación OCR completada en ${totalTime}ms`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log(`[documentAPI] 📊 Resultado REAL de OCR:`, result);
-      
-      return result;
-    } catch (error) {
-      const totalTime = Date.now() - startTime;
-      console.error(`[documentAPI] 💥 Error en validación REAL después de ${totalTime}ms:`, error);
-      
-      return {
-        valid: false,
-        message: "Error al validar el documento con OCR",
-        error: error.message,
-        processingTime: totalTime
-      };
-    }
-  },
-
-  /**
-   * Obtiene el estado de validación
-   * @returns {Promise<Object>} Estado del servicio
-   */
-  getValidationStatus: async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/dni-validation/health`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      return result;
-    } catch (error) {
-      console.error(`[documentAPI] Error obteniendo estado:`, error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
+    // Simular procesamiento rápido
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    return {
+      valid: true,
+      message: "Imagen aceptada sin validación",
+      type: type,
+      processingTime: 100
+    };
   }
 };
 
-// ===== VALIDACIÓN FACIAL =====
+// ===== VALIDACIÓN FACIAL (SIN VALIDACIONES) =====
+
+export const reviewsAPI = {
+  // Obtener reseñas de un profesional
+  getProfessionalReviews: async (professionalId) => {
+    return await apiRequest(`/reviews/${professionalId}`);
+  },
+
+  // Crear una nueva reseña
+  createReview: async (reviewData) => {
+    return await apiRequest("/reviews", {
+      method: "POST",
+      body: JSON.stringify(reviewData),
+    });
+  },
+
+  // Actualizar una reseña
+  updateReview: async (reviewId, reviewData) => {
+    return await apiRequest(`/reviews/${reviewId}`, {
+      method: "PUT",
+      body: JSON.stringify(reviewData),
+    });
+  },
+
+  // Eliminar una reseña
+  deleteReview: async (reviewId) => {
+    return await apiRequest(`/reviews/${reviewId}`, {
+      method: "DELETE",
+    });
+  },
+};
+
+// Función para hacer peticiones HTTP con autenticación
+const apiRequestWithAuth = async (endpoint, options = {}, userId) => {
+  try {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const config = {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "user-id": userId, // Agregar el ID del usuario en los headers
+      },
+      ...options,
+    };
+
+    console.log(`[API] ${config.method} ${url}`);
+    console.log(`[API] Request body:`, config.body);
+    console.log(`[API] User ID:`, userId);
+    
+    const response = await fetch(url, config);
+    const data = await response.json();
+
+    console.log(`[API] Response status:`, response.status);
+    console.log(`[API] Response data:`, JSON.stringify(data, null, 2));
+
+    if (!response.ok) {
+      throw new Error(data.error || `HTTP error! status: ${response.status}`);
+    }
+
+    // Si el backend devuelve { success: true, data: [...] }, extraer solo el data
+    if (data.success && data.data !== undefined) {
+      return new ApiResponse(true, data.data, data.message, null);
+    }
+
+    return new ApiResponse(true, data, data.message, null);
+  } catch (error) {
+    console.error(`[API] Error en ${endpoint}:`, error);
+    return new ApiResponse(false, null, null, error.message);
+  }
+};
+
+export const adminAPI = {
+  // Obtener profesionales pendientes de validación
+  getPendingProfessionals: async (userId) => {
+    return await apiRequestWithAuth("/admin/professionals/pending", {}, userId);
+  },
+
+  // Obtener profesionales aprobados
+  getApprovedProfessionals: async (userId) => {
+    return await apiRequestWithAuth("/admin/professionals/approved", {}, userId);
+  },
+
+  // Obtener profesionales rechazados
+  getRejectedProfessionals: async (userId) => {
+    return await apiRequestWithAuth("/admin/professionals/rejected", {}, userId);
+  },
+
+  // Obtener detalles de un profesional
+  getProfessionalDetails: async (professionalId, userId) => {
+    return await apiRequestWithAuth(`/admin/professionals/${professionalId}`, {}, userId);
+  },
+
+  // Aprobar profesional
+  approveProfessional: async (professionalId, validationNotes, userId) => {
+    return await apiRequestWithAuth(`/admin/professionals/${professionalId}/approve`, {
+      method: "POST",
+      body: JSON.stringify({ validationNotes }),
+    }, userId);
+  },
+
+  // Rechazar profesional
+  rejectProfessional: async (professionalId, rejectionReason, validationNotes, userId) => {
+    return await apiRequestWithAuth(`/admin/professionals/${professionalId}/reject`, {
+      method: "POST",
+      body: JSON.stringify({ rejectionReason, validationNotes }),
+    }, userId);
+  },
+
+  // Obtener estadísticas de administración
+  getAdminStats: async (userId) => {
+    return await apiRequestWithAuth("/admin/stats", {}, userId);
+  },
+};
 
 export const faceValidationAPI = {
   /**
-   * Valida una selfie
+   * Simula validación de selfie (sin validaciones reales)
    * @param {File} selfieFile - Archivo de imagen de la selfie
-   * @returns {Promise<Object>} Resultado de la validación
+   * @returns {Promise<Object>} Resultado simulado (siempre válido)
    */
   validateSelfie: async (selfieFile) => {
-    const startTime = Date.now();
-    console.log(`[faceValidationAPI] 🚀 Iniciando validación REAL de selfie`);
+    console.log(`[faceValidationAPI] ✅ Selfie aceptada sin validación`);
     
-    try {
-      // Verificar que el archivo existe
-      if (!selfieFile) {
-        return {
-          success: false,
-          error: "No se proporcionó archivo de selfie"
-        };
-      }
-
-      console.log(`[faceValidationAPI] 📤 Enviando selfie al backend para validación real...`);
-      
-      const formData = new FormData();
-      formData.append("selfie", selfieFile);
-
-      const response = await fetch(`${API_BASE_URL}/face-validation-prod/validate-selfie`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const totalTime = Date.now() - startTime;
-      console.log(`[faceValidationAPI] ⏰ Validación completada en ${totalTime}ms`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log(`[faceValidationAPI] 📊 Resultado REAL de validación:`, result);
-      
-      return result;
-    } catch (error) {
-      const totalTime = Date.now() - startTime;
-      console.error(`[faceValidationAPI] 💥 Error en validación REAL después de ${totalTime}ms:`, error);
-      
-      return {
-        success: false,
-        error: error.message,
-        processingTime: totalTime
-      };
-    }
-  },
-
+    // Simular procesamiento rápido
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    return {
+      success: true,
+      message: "Selfie aceptada sin validación",
+      processingTime: 100
+    };
+  }
 };
+
+

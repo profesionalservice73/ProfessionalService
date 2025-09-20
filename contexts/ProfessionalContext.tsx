@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
+import { useNotifications } from './NotificationContext';
 import { professionalAPI } from '../services/api';
 
 interface ProfessionalData {
@@ -48,33 +49,49 @@ export const useProfessional = () => {
 
 export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  
+  // Usar notificaciones de manera segura
+  let notifyNewRequest: any = null;
+  try {
+    const notifications = useNotifications();
+    notifyNewRequest = notifications.notifyNewRequest;
+  } catch (error) {
+    // Si no hay NotificationProvider disponible, continuar sin notificaciones
+    console.log('⚠️ NotificationProvider no disponible, continuando sin notificaciones');
+  }
   const [professional, setProfessional] = useState<ProfessionalData | null>(null);
   const [isRegistrationComplete, setIsRegistrationComplete] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // Cargar datos del profesional desde el backend
   const loadProfessionalData = async () => {
+    console.log('🔍 ProfessionalContext - loadProfessionalData iniciado');
+    console.log('🔍 ProfessionalContext - user?.id:', user?.id);
+    
     if (!user?.id) {
+      console.log('🔍 ProfessionalContext - No hay user.id, estableciendo loading false');
       setLoading(false);
       return;
     }
 
     try {
+      console.log('🔍 ProfessionalContext - Estableciendo loading true');
       setLoading(true);
+      console.log('🔍 ProfessionalContext - Llamando a professionalAPI.getProfileByUserId con userId:', user.id);
+      
       const response = await professionalAPI.getProfileByUserId(user.id);
+      console.log('🔍 ProfessionalContext - Response completa:', JSON.stringify(response, null, 2));
       
       if (response.success && response.data) {
         console.log('🔍 ProfessionalContext - Response del backend:', response.data);
-        console.log('🔍 ProfessionalContext - Especialidades del backend:', response.data.specialties);
-        console.log('🔍 ProfessionalContext - Tipo de especialidades:', typeof response.data.specialties);
-        console.log('🔍 ProfessionalContext - Es array?', Array.isArray(response.data.specialties));
+        console.log('🔍 ProfessionalContext - isRegistrationComplete del backend:', response.data.isRegistrationComplete);
         
         const professionalData: ProfessionalData = {
           id: response.data.id,
           name: response.data.fullName,
           email: response.data.email,
           phone: response.data.phone,
-          specialties: response.data.specialties || [], // Cambiar a especialidades
+          specialties: response.data.specialties || [],
           experience: response.data.experience || '',
           description: response.data.description || '',
           location: response.data.location || '',
@@ -83,7 +100,7 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
           services: response.data.services || [],
           priceRange: response.data.priceRange || '',
           certifications: response.data.certifications || [],
-          certificationDocuments: response.data.certificationDocuments || [], // Agregar documentos
+          certificationDocuments: response.data.certificationDocuments || [],
           languages: response.data.languages || [],
           workPhotos: response.data.workPhotos || [],
           profileImage: response.data.profileImage || '',
@@ -95,13 +112,16 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
         };
 
         console.log('🔍 ProfessionalContext - ProfessionalData creado:', professionalData);
-        console.log('🔍 ProfessionalContext - Especialidades en ProfessionalData:', professionalData.specialties);
+        console.log('🔍 ProfessionalContext - isRegistrationComplete en ProfessionalData:', professionalData.isRegistrationComplete);
 
         console.log('🔍 ProfessionalContext - Antes de setProfessional');
         setProfessional(professionalData);
         console.log('🔍 ProfessionalContext - Después de setProfessional');
+        console.log('🔍 ProfessionalContext - Antes de setIsRegistrationComplete con:', professionalData.isRegistrationComplete);
         setIsRegistrationComplete(professionalData.isRegistrationComplete);
+        console.log('🔍 ProfessionalContext - Después de setIsRegistrationComplete');
       } else {
+        console.log('🔍 ProfessionalContext - Response no exitosa o sin data:', response);
         setProfessional(null);
         setIsRegistrationComplete(false);
       }
@@ -110,6 +130,7 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setProfessional(null);
       setIsRegistrationComplete(false);
     } finally {
+      console.log('🔍 ProfessionalContext - Estableciendo loading false');
       setLoading(false);
     }
   };

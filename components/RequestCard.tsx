@@ -130,7 +130,9 @@ export const RequestCard: React.FC<RequestCardProps> = ({
         <View style={styles.detailItem}>
           <Ionicons name="location-outline" size={14} color={theme.colors.textSecondary} />
           <Text style={styles.detailText}>
-            {request.location}
+            {typeof request.location === 'object' && request.location?.address 
+              ? request.location.address 
+              : request.location || 'Ubicación no disponible'}
           </Text>
         </View>
       </View>

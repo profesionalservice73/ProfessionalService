@@ -3,11 +3,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { ProfessionalCard } from '../../components/ProfessionalCard';
@@ -104,7 +104,13 @@ export default function FavoritesScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header con logo */}
-      <Header title="Mis Favoritos" />
+      <Header 
+        title="Mis Favoritos" 
+        rightAction={{
+          icon: 'settings-outline',
+          onPress: () => navigation.navigate('ClientSettings')
+        }}
+      />
       
       {/* Stats */}
       <View style={styles.headerStats}>

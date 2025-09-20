@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../config/theme';
@@ -38,6 +38,10 @@ const getStatusColor = (status: string) => {
       return theme.colors.primary;
     case 'completed':
       return theme.colors.success;
+    case 'awaiting_rating':
+      return theme.colors.primary;
+    case 'closed':
+      return theme.colors.success;
     case 'cancelled':
       return theme.colors.error;
     default:
@@ -52,9 +56,13 @@ const getStatusText = (status: string) => {
     case 'accepted':
       return 'Aceptada';
     case 'in_progress':
-      return 'Aceptada';
+      return 'En Progreso';
     case 'completed':
       return 'Completada';
+    case 'awaiting_rating':
+      return 'Esperando Calificación';
+    case 'closed':
+      return 'Cerrada';
     case 'cancelled':
       return 'Cancelada';
     default:
@@ -93,7 +101,11 @@ const RequestCard = ({ request }: { request: any }) => (
       </View>
       <View style={styles.detailItem}>
         <Ionicons name="location-outline" size={16} color={theme.colors.textSecondary} />
-        <Text style={styles.detailText}>{request.location}</Text>
+        <Text style={styles.detailText}>
+          {typeof request.location === 'object' && request.location?.address 
+            ? request.location.address 
+            : request.location || 'Ubicación no disponible'}
+        </Text>
       </View>
       <View style={styles.detailItem}>
         <Ionicons name="cash-outline" size={16} color={theme.colors.textSecondary} />
@@ -121,9 +133,8 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
   // Verificar si el profesional ha completado su registro
   useEffect(() => {
     if (!loading && !isRegistrationComplete) {
-      console.log('ProfessionalHomeScreen - Usuario no ha completado registro, redirigiendo...');
-      // Redirigir al formulario de registro
-      navigation.replace('ProfessionalRegister');
+      console.log('ProfessionalHomeScreen - Usuario no ha completado registro');
+      // Ya no redirigimos, solo mostramos el mensaje en la UI
     }
   }, [loading, isRegistrationComplete, navigation]);
 
@@ -214,9 +225,9 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
           </Text>
           <TouchableOpacity
             style={styles.completeButton}
-            onPress={() => navigation.navigate('ProfessionalRegister')}
+            onPress={() => navigation.navigate('EditProfile')}
           >
-            <Text style={styles.completeButtonText}>Completar Registro</Text>
+            <Text style={styles.completeButtonText}>Completar Perfil</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -236,9 +247,9 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
           </Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => navigation.replace('ProfessionalRegister')}
+            onPress={() => navigation.navigate('EditProfile')}
           >
-            <Text style={styles.retryButtonText}>Reintentar</Text>
+            <Text style={styles.retryButtonText}>Completar Perfil</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -249,7 +260,13 @@ export default function ProfessionalHomeScreen({ navigation }: any) {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Header con logo */}
-        <Header title="Dashboard" />
+        <Header 
+          title="Dashboard" 
+          rightAction={{
+            icon: 'settings-outline',
+            onPress: () => navigation.navigate('Settings')
+          }}
+        />
         
         {/* Header con gradiente */}
         <LinearGradient
@@ -629,3 +646,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+

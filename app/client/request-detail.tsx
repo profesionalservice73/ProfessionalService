@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import {
   View,
@@ -10,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { AppleMaps, GoogleMaps } from "expo-maps";
 import { theme } from "../../config/theme";
 import { useNavigation } from "@react-navigation/native";
 
@@ -22,6 +23,7 @@ export default function RequestDetailScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState(false);
   const [mapKey, setMapKey] = useState(0);
+  const [imageError, setImageError] = useState(false);
 
   // Datos de ejemplo de la solicitud
   const request = {
@@ -36,9 +38,9 @@ export default function RequestDetailScreen() {
       "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400",
     ],
     location: {
-      latitude: 4.711,
-      longitude: -74.0721,
-      address: "Chico Norte, Bogotá, Colombia",
+      latitude: 40.7128,
+      longitude: -74.0060,
+      address: "Nueva York, NY, Estados Unidos",
     },
     requester: {
       name: "María González",
@@ -78,13 +80,38 @@ export default function RequestDetailScreen() {
     setMapKey(prev => prev + 1);
   };
 
+  const handleImageError = () => {
+    console.log('❌ Error cargando imagen:', request.images[currentImageIndex]);
+    setImageError(true);
+  };
+
+  const retryImage = () => {
+    setImageError(false);
+  };
+
+  // Validar que hay imágenes disponibles
+  const hasValidImages = request.images && request.images.length > 0 && request.images.every(img => img && img.trim() !== '');
+  const currentImage = hasValidImages ? request.images[currentImageIndex] : null;
+
+  // Debug: Log de imágenes
+  console.log('🖼️ Imágenes de la solicitud:', {
+    hasImages: !!request.images,
+    imagesLength: request.images?.length || 0,
+    images: request.images,
+    hasValidImages,
+    currentImageIndex,
+    currentImage
+  });
+
   const renderMap = () => {
     if (mapError) {
       return (
         <View style={styles.mapFallback}>
           <Ionicons name="map-outline" size={48} color={theme.colors.textSecondary} />
           <Text style={styles.mapFallbackText}>Error al cargar el mapa</Text>
-          <Text style={styles.mapFallbackSubtext}>{request.location.address}</Text>
+          <Text style={styles.mapFallbackSubtext}>
+            {request.location?.address || 'Dirección no disponible'}
+          </Text>
           <TouchableOpacity style={styles.retryButton} onPress={retryMap}>
             <Text style={styles.retryButtonText}>Reintentar</Text>
           </TouchableOpacity>
@@ -92,54 +119,58 @@ export default function RequestDetailScreen() {
       );
     }
 
-    // Configuración específica por plataforma
-    const mapProvider = Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
-    
-    return (
-      <View style={styles.mapContainer}>
-        <MapView
-          key={mapKey}
+    const markers = [
+      {
+        id: 'request-location',
+        coordinates: {
+          latitude: request.location?.latitude || 0,
+          longitude: request.location?.longitude || 0,
+        },
+        title: 'Ubicación del servicio',
+        snippet: request.location?.address || 'Dirección no disponible',
+        showCallout: true,
+      }
+    ];
+
+    if (Platform.OS === 'ios') {
+      return (
+        <AppleMaps.View 
+          key={mapKey} 
           style={styles.map}
-          provider={mapProvider}
-          initialRegion={{
-            latitude: request.location.latitude,
-            longitude: request.location.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
+          markers={markers}
+          cameraPosition={{
+            coordinates: {
+              latitude: request.location?.latitude || 0,
+              longitude: request.location?.longitude || 0,
+            },
+            zoom: 15,
           }}
-          onMapReady={handleMapReady}
-          showsUserLocation={false}
-          showsMyLocationButton={false}
-          showsCompass={true}
-          showsScale={true}
-          loadingEnabled={true}
-          loadingIndicatorColor={theme.colors.primary}
-          loadingBackgroundColor={theme.colors.background}
-          mapType="standard"
-          zoomEnabled={true}
-          scrollEnabled={true}
-          rotateEnabled={false}
-          pitchEnabled={false}
-          toolbarEnabled={false}
-          liteMode={false}
-        >
-          <Marker
-            coordinate={{
-              latitude: request.location.latitude,
-              longitude: request.location.longitude,
-            }}
-            title="Ubicación del servicio"
-            description={request.location.address}
-            pinColor={theme.colors.primary}
-          />
-        </MapView>
-        {!mapReady && !mapError && (
-          <View style={styles.mapLoading}>
-            <Text style={styles.mapLoadingText}>Cargando mapa...</Text>
-          </View>
-        )}
-      </View>
-    );
+        />
+      );
+    } else if (Platform.OS === 'android') {
+      return (
+        <GoogleMaps.View 
+          key={mapKey} 
+          style={styles.map}
+          markers={markers}
+          cameraPosition={{
+            coordinates: {
+              latitude: request.location?.latitude || 0,
+              longitude: request.location?.longitude || 0,
+            },
+            zoom: 15,
+          }}
+        />
+      );
+    } else {
+      return (
+        <View style={styles.map}>
+          <Text style={styles.unsupportedText}>
+            Los mapas solo están disponibles en Android e iOS
+          </Text>
+        </View>
+      );
+    }
   };
 
   return (
@@ -147,35 +178,56 @@ export default function RequestDetailScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Imagen principal */}
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: request.images[currentImageIndex] }}
-            style={styles.mainImage}
-            resizeMode="cover"
-          />
+          {hasValidImages && !imageError && currentImage ? (
+            <Image
+              source={{ uri: currentImage }}
+              style={styles.mainImage}
+              resizeMode="cover"
+              onError={handleImageError}
+            />
+          ) : (
+            <View style={styles.imageFallback}>
+              <Ionicons name="image-outline" size={48} color={theme.colors.textSecondary} />
+              <Text style={styles.imageFallbackText}>
+                {!hasValidImages ? 'No hay imágenes disponibles' : 'Error al cargar la imagen'}
+              </Text>
+              {imageError && (
+                <TouchableOpacity style={styles.retryButton} onPress={retryImage}>
+                  <Text style={styles.retryButtonText}>Reintentar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
-          {/* Flechas de navegación */}
-          <TouchableOpacity style={styles.navArrow} onPress={prevImage}>
-            <Ionicons name="chevron-back" size={24} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.navArrow, styles.navArrowRight]}
-            onPress={nextImage}
-          >
-            <Ionicons name="chevron-forward" size={24} color="white" />
-          </TouchableOpacity>
+          {/* Flechas de navegación - solo si hay imágenes válidas */}
+          {hasValidImages && request.images.length > 1 && (
+            <>
+              <TouchableOpacity style={styles.navArrow} onPress={prevImage}>
+                <Ionicons name="chevron-back" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.navArrow, styles.navArrowRight]}
+                onPress={nextImage}
+              >
+                <Ionicons name="chevron-forward" size={24} color="white" />
+              </TouchableOpacity>
+            </>
+          )}
 
-          {/* Indicadores de imagen */}
-          <View style={styles.imageIndicators}>
-            {request.images.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.indicator,
-                  index === currentImageIndex && styles.activeIndicator,
-                ]}
-              />
-            ))}
-          </View>
+          {/* Indicadores de imagen - solo si hay imágenes válidas */}
+          {hasValidImages && request.images.length > 1 && (
+            <View style={styles.imageIndicators}>
+              {request.images.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.indicator,
+                    index === currentImageIndex && styles.activeIndicator,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.content}>
@@ -227,7 +279,9 @@ export default function RequestDetailScreen() {
           <View style={styles.mapSection}>
             <Text style={styles.sectionTitle}>Ubicación</Text>
             {renderMap()}
-            <Text style={styles.addressText}>{request.location.address}</Text>
+            <Text style={styles.addressText}>
+              {request.location?.address || 'Dirección no disponible'}
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -253,6 +307,19 @@ const styles = StyleSheet.create({
   mainImage: {
     width: "100%",
     height: "100%",
+  },
+  imageFallback: {
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.colors.background,
+  },
+  imageFallbackText: {
+    fontSize: 16,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
+    textAlign: "center",
   },
   navArrow: {
     position: "absolute",
@@ -361,6 +428,8 @@ const styles = StyleSheet.create({
   },
   mapSection: {
     marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+    alignItems: 'center',
   },
   sectionTitle: {
     fontSize: 18,
@@ -369,7 +438,8 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
   },
   mapContainer: {
-    height: 300,
+    width: "100%",
+    height: 120,
     borderRadius: theme.borderRadius.md,
     borderWidth: 1,
     borderColor: theme.colors.border,
@@ -377,13 +447,15 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.sm,
     backgroundColor: theme.colors.background,
     position: "relative",
+    alignSelf: 'center',
   },
   map: {
     width: "100%",
     height: "100%",
   },
   mapFallback: {
-    height: 300,
+    width: "100%",
+    height: 120,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: theme.colors.background,
@@ -434,9 +506,10 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontSize: 14,
-    color: theme.colors.textSecondary,
+    color: theme.colors.text,
     textAlign: "center",
-    fontStyle: "italic",
+    fontWeight: "500",
+    marginTop: theme.spacing.sm,
   },
   chatButton: {
     position: "absolute",
@@ -464,5 +537,40 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: theme.colors.primary,
     fontWeight: "600",
+  },
+  unsupportedText: {
+    textAlign: 'center',
+    color: theme.colors.textSecondary,
+    fontSize: 14,
+    padding: 20,
+  },
+  // Estilos para el placeholder del mapa
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.lg,
+  },
+  mapPlaceholderText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: theme.colors.text,
+    marginTop: theme.spacing.md,
+    textAlign: "center",
+  },
+  mapPlaceholderSubtext: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.sm,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  mapPlaceholderNote: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    marginTop: theme.spacing.md,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

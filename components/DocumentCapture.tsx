@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,36 +6,15 @@ import {
   TouchableOpacity,
   Image,
   Alert,
-  ActivityIndicator,
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
-import * as FileSystem from "expo-file-system";
 import { theme } from "../config/theme";
-import { documentAPI } from "../services/api";
 
 interface DocumentCaptureProps {
   onDocumentCaptured: (frontUri: string, backUri: string) => void;
   onBack: () => void;
-}
-
-interface DocumentValidation {
-  isValid: boolean;
-  issues: string[];
-  score: number;
-  confidence?: "low" | "medium" | "high";
-  recommendations?: string[];
-}
-
-interface DocumentValidationResult {
-  isValid: boolean;
-  score: number;
-  issues: string[];
-  confidence: "low" | "medium" | "high";
-  documentType: string;
-  side: string;
-  recommendations: string[];
 }
 
 export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
@@ -44,91 +23,7 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
 }) => {
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [backImage, setBackImage] = useState<string | null>(null);
-  const [frontValidation, setFrontValidation] =
-    useState<DocumentValidation | null>(null);
-  const [backValidation, setBackValidation] =
-    useState<DocumentValidation | null>(null);
-  const [isValidatingFront, setIsValidatingFront] = useState(false);
-  const [isValidatingBack, setIsValidatingBack] = useState(false);
 
-  // Resetear estado de validación cuando se cambia de documento
-  useEffect(() => {
-    // Resetear validaciones cuando se monta el componente
-    setFrontValidation(null);
-    setBackValidation(null);
-    setIsValidatingFront(false);
-    setIsValidatingBack(false);
-  }, []);
-
-  const validateDocument = async (
-    imageUri: string,
-    type: "front" | "back"
-  ): Promise<DocumentValidation> => {
-    try {
-      console.log(
-        `[DocumentCapture] Iniciando validación REAL con OCR para DNI ${type}`
-      );
-
-      // Convertir imagen a base64
-      const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Usar API del backend para validación REAL con OCR
-      const response: any = await documentAPI.validateDNI(base64Image, type);
-
-      console.log(`[DocumentCapture] Respuesta REAL del backend:`, response);
-
-      // El backend devuelve directamente { valid: true, ... }
-      if (response.valid) {
-        console.log(`[DocumentCapture] Validación REAL exitosa:`, {
-          valid: response.valid,
-          dni: response.dni,
-          birthDate: response.birthDate,
-          name: response.name,
-          confidence: response.confidence,
-        });
-
-        return {
-          isValid: true,
-          issues: [],
-          score: response.confidence || 0, // Solo usar confianza real del OCR
-          confidence:
-            response.confidence > 80
-              ? "high"
-              : response.confidence > 60
-              ? "medium"
-              : "low",
-          recommendations: ["Documento validado correctamente con OCR REAL"],
-        };
-      } else {
-        console.log(`[DocumentCapture] Validación REAL fallida:`, response.message);
-
-        return {
-          isValid: false,
-          issues: [response.message || "El documento no es válido"],
-          score: 0,
-          confidence: "low",
-          recommendations: [
-            "Asegúrate de que la imagen sea clara y legible",
-            "Verifica que sea el " +
-              (type === "front" ? "frente" : "dorso") +
-              " del DNI",
-            "Evita sombras, reflejos o cortes en la imagen",
-          ],
-        };
-      }
-    } catch (error) {
-      console.error("[DocumentCapture] Error en validación REAL con OCR:", error);
-      return {
-        isValid: false,
-        issues: ["Error al validar el documento con OCR. Intenta nuevamente."],
-        score: 0,
-        confidence: "low",
-        recommendations: ["Verifica que la imagen sea clara y completa"],
-      };
-    }
-  };
 
   const requestCameraPermission = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
@@ -158,63 +53,19 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
 
-        // Resetear estado de validación anterior
+        // Simplemente guardar la imagen sin validación
         if (type === "front") {
-          setFrontValidation(null);
+          setFrontImage(imageUri);
         } else {
-          setBackValidation(null);
+          setBackImage(imageUri);
         }
 
-        if (type === "front") {
-          setIsValidatingFront(true);
-        } else {
-          setIsValidatingBack(true);
-        }
-
-        try {
-          const validation = await validateDocument(imageUri, type);
-
-          if (type === "front") {
-            setFrontImage(imageUri);
-            setFrontValidation(validation);
-          } else {
-            setBackImage(imageUri);
-            setBackValidation(validation);
-          }
-
-          if (!validation.isValid) {
-            const sideText = type === "front" ? "frente" : "dorso";
-
-            Alert.alert(
-              "Documento no válido",
-              `🔍 El OCR no pudo validar esta imagen como el ${sideText} de un DNI argentino.\n\n${validation.issues.join(
-                "\n"
-              )}\n\n💡 Sugerencias:\n${validation.recommendations.join("\n")}`,
-              [{ text: "Entendido" }]
-            );
-          } else {
-            const sideText = type === "front" ? "frente" : "dorso";
-
-            Alert.alert(
-              "Documento válido",
-              `✅ ${sideText.toUpperCase()} del DNI argentino validado correctamente con OCR.\n\nConfianza: ${
-                validation.score
-              }%`,
-              [{ text: "Continuar" }]
-            );
-          }
-        } catch (error) {
-          Alert.alert(
-            "Error",
-            "Error al validar el documento. Intenta de nuevo."
-          );
-        } finally {
-          if (type === "front") {
-          setIsValidatingFront(false);
-        } else {
-          setIsValidatingBack(false);
-        }
-        }
+        const sideText = type === "front" ? "frente" : "dorso";
+        Alert.alert(
+          "Imagen capturada",
+          `✅ ${sideText.toUpperCase()} del DNI capturado correctamente.`,
+          [{ text: "Continuar" }]
+        );
       }
     } catch (error) {
       Alert.alert("Error", "Error al capturar la imagen");
@@ -233,63 +84,19 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
       if (!result.canceled && result.assets[0]) {
         const imageUri = result.assets[0].uri;
 
-        // Resetear estado de validación anterior
+        // Simplemente guardar la imagen sin validación
         if (type === "front") {
-          setFrontValidation(null);
+          setFrontImage(imageUri);
         } else {
-          setBackValidation(null);
+          setBackImage(imageUri);
         }
 
-        if (type === "front") {
-          setIsValidatingFront(true);
-        } else {
-          setIsValidatingBack(true);
-        }
-
-        try {
-          const validation = await validateDocument(imageUri, type);
-
-          if (type === "front") {
-            setFrontImage(imageUri);
-            setFrontValidation(validation);
-          } else {
-            setBackImage(imageUri);
-            setBackValidation(validation);
-          }
-
-          if (!validation.isValid) {
-            const sideText = type === "front" ? "frente" : "dorso";
-
-            Alert.alert(
-              "Documento no válido",
-              `🔍 El OCR no pudo validar esta imagen como el ${sideText} de un DNI argentino.\n\n${validation.issues.join(
-                "\n"
-              )}\n\n💡 Sugerencias:\n${validation.recommendations.join("\n")}`,
-              [{ text: "Entendido" }]
-            );
-          } else {
-            const sideText = type === "front" ? "frente" : "dorso";
-
-            Alert.alert(
-              "Documento válido",
-              `✅ ${sideText.toUpperCase()} del DNI argentino validado correctamente con OCR.\n\nConfianza: ${
-                validation.score
-              }%`,
-              [{ text: "Continuar" }]
-            );
-          }
-        } catch (error) {
-          Alert.alert(
-            "Error",
-            "Error al validar el documento. Intenta de nuevo."
-          );
-        } finally {
-          if (type === "front") {
-          setIsValidatingFront(false);
-        } else {
-          setIsValidatingBack(false);
-        }
-        }
+        const sideText = type === "front" ? "frente" : "dorso";
+        Alert.alert(
+          "Imagen seleccionada",
+          `✅ ${sideText.toUpperCase()} del DNI seleccionado correctamente.`,
+          [{ text: "Continuar" }]
+        );
       }
     } catch (error) {
       Alert.alert("Error", "Error al seleccionar la imagen");
@@ -305,25 +112,19 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
   };
 
   const handleContinue = () => {
-    if (
-      frontImage &&
-      backImage &&
-      frontValidation?.isValid &&
-      backValidation?.isValid
-    ) {
+    if (frontImage && backImage) {
       onDocumentCaptured(frontImage, backImage);
     } else {
       Alert.alert(
         "Documentos requeridos",
-        "Debes capturar y validar tanto el frente como el dorso del DNI para continuar."
+        "Debes capturar tanto el frente como el dorso del DNI para continuar."
       );
     }
   };
 
   const renderDocumentSection = (
     type: "front" | "back",
-    image: string | null,
-    validation: DocumentValidation | null
+    image: string | null
   ) => {
     const isFront = type === "front";
     const title = isFront ? "DNI - Frente" : "DNI - Dorso";
@@ -344,39 +145,10 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
           <View style={styles.imageContainer}>
             <Image source={{ uri: image }} style={styles.documentImage} />
 
-            {validation && (
-              <View
-                style={[
-                  styles.validationStatus,
-                  validation.isValid
-                    ? styles.validationSuccess
-                    : styles.validationError,
-                ]}
-              >
-                <Ionicons
-                  name={
-                    validation.isValid ? "checkmark-circle" : "close-circle"
-                  }
-                  size={20}
-                  color={
-                    validation.isValid
-                      ? theme.colors.success
-                      : theme.colors.error
-                  }
-                />
-                <Text
-                  style={[
-                    styles.validationText,
-                    validation.isValid
-                      ? styles.validationSuccessText
-                      : styles.validationErrorText,
-                  ]}
-                >
-                  {validation.isValid ? "Válido" : "No válido"} (
-                  {validation.score}%)
-                </Text>
-              </View>
-            )}
+            <View style={styles.validationStatus}>
+              <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+              <Text style={styles.validationText}>Imagen capturada</Text>
+            </View>
 
             <TouchableOpacity
               style={styles.retakeButton}
@@ -391,7 +163,6 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
             <TouchableOpacity
               style={styles.captureButton}
               onPress={() => captureDocument(type)}
-              disabled={isValidatingFront || isValidatingBack}
             >
               <Ionicons name="camera" size={24} color={theme.colors.white} />
               <Text style={styles.captureButtonText}>Cámara</Text>
@@ -400,25 +171,10 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
             <TouchableOpacity
               style={styles.captureButton}
               onPress={() => selectFromGallery(type)}
-              disabled={isValidatingFront || isValidatingBack}
             >
               <Ionicons name="images" size={24} color={theme.colors.white} />
               <Text style={styles.captureButtonText}>Galería</Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {validation && !validation.isValid && (
-          <View style={styles.issuesContainer}>
-            <Text style={styles.issuesTitle}>🔍 Validación por OCR:</Text>
-            <Text style={styles.issueText}>
-              • Esta imagen no es el {type === "front" ? "frente" : "dorso"} de
-              un DNI argentino válido
-            </Text>
-            <Text style={styles.issueText}>
-              • Por favor, captura una imagen del{" "}
-              {type === "front" ? "frente" : "dorso"} del documento de identidad
-            </Text>
           </View>
         )}
       </View>
@@ -448,45 +204,25 @@ export const DocumentCapture: React.FC<DocumentCaptureProps> = ({
             color={theme.colors.primary}
           />
           <Text style={styles.instructionsText}>
-            Para completar tu verificación, necesitamos capturar el frente y
+            Para completar tu registro, necesitamos capturar el frente y
             dorso de tu DNI. Asegúrate de que el documento esté bien iluminado y
             sin reflejos.
           </Text>
         </View>
 
-        {renderDocumentSection("front", frontImage, frontValidation)}
-        {renderDocumentSection("back", backImage, backValidation)}
-
-        {(isValidatingFront || isValidatingBack) && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>
-              🔍 Validando documento con OCR...
-            </Text>
-            <Text style={styles.loadingSubtext}>
-              Extrayendo datos del DNI argentino
-            </Text>
-          </View>
-        )}
+        {renderDocumentSection("front", frontImage)}
+        {renderDocumentSection("back", backImage)}
       </ScrollView>
 
       <View style={styles.footer}>
         <TouchableOpacity
           style={[
             styles.continueButton,
-            (!frontImage ||
-              !backImage ||
-              !frontValidation?.isValid ||
-              !backValidation?.isValid) &&
+            (!frontImage || !backImage) &&
               styles.continueButtonDisabled,
           ]}
           onPress={handleContinue}
-          disabled={
-            !frontImage ||
-            !backImage ||
-            !frontValidation?.isValid ||
-            !backValidation?.isValid
-          }
+          disabled={!frontImage || !backImage}
         >
           <Text style={styles.continueButtonText}>Continuar</Text>
           <Ionicons name="arrow-forward" size={20} color={theme.colors.white} />
@@ -586,22 +322,11 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xs,
     borderRadius: theme.borderRadius.sm,
   },
-  validationSuccess: {
-    borderColor: theme.colors.success,
-  },
-  validationError: {
-    borderColor: theme.colors.error,
-  },
   validationText: {
     fontSize: 12,
     fontWeight: "600",
     marginLeft: theme.spacing.xs,
-  },
-  validationSuccessText: {
     color: theme.colors.success,
-  },
-  validationErrorText: {
-    color: theme.colors.error,
   },
   retakeButton: {
     position: "absolute",
@@ -640,53 +365,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     marginLeft: theme.spacing.sm,
-  },
-  issuesContainer: {
-    backgroundColor: theme.colors.error + "10",
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginTop: theme.spacing.sm,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.error,
-  },
-  issuesTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: theme.colors.error,
-    marginBottom: theme.spacing.xs,
-  },
-  issueText: {
-    fontSize: 12,
-    color: theme.colors.error,
-    marginBottom: theme.spacing.xs,
-  },
-  recommendationsTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: theme.colors.primary,
-    marginTop: theme.spacing.sm,
-    marginBottom: theme.spacing.xs,
-  },
-  recommendationText: {
-    fontSize: 12,
-    color: theme.colors.primary,
-    marginBottom: theme.spacing.xs,
-  },
-  loadingContainer: {
-    alignItems: "center",
-    padding: theme.spacing.xl,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.md,
-    fontWeight: "600",
-  },
-  loadingSubtext: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-    marginTop: theme.spacing.xs,
-    textAlign: "center",
   },
   footer: {
     padding: theme.spacing.lg,

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
@@ -16,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import { theme } from "../../config/theme";
 import { Header } from "../../components/Header";
+import { SafeScreen } from "../../components/SafeScreen";
 import { LocationMap } from "../../components/LocationMap";
 import { formatDateForDisplay } from "../../utils/dateUtils";
 import { professionalAPI } from "../../services/api";
@@ -42,7 +42,13 @@ export default function RequestDetailScreen({ route, navigation }: any) {
       setLoading(true);
       // Por ahora usamos los datos que vienen de la lista
       // En el futuro podríamos crear una ruta específica para obtener detalles
-      setRequest(route.params.request);
+      const requestData = route.params.request;
+      console.log('📱 Datos de la solicitud:', requestData);
+      console.log('📱 ContactPhone:', requestData?.contactPhone);
+      console.log('📱 ClientId phone:', requestData?.clientId?.phone);
+      console.log('📍 Estructura de location:', requestData?.location);
+      console.log('📍 Tipo de location:', typeof requestData?.location);
+      setRequest(requestData);
     } catch (error) {
       console.error("Error loading request detail:", error);
       Alert.alert("Error", "No se pudo cargar los detalles de la solicitud");
@@ -87,6 +93,10 @@ export default function RequestDetailScreen({ route, navigation }: any) {
         return theme.colors.primary;
       case "completed":
         return theme.colors.success;
+      case "awaiting_rating":
+        return theme.colors.primary;
+      case "closed":
+        return theme.colors.success;
       case "cancelled":
         return theme.colors.error;
       default:
@@ -101,9 +111,13 @@ export default function RequestDetailScreen({ route, navigation }: any) {
       case "accepted":
         return "Aceptada";
       case "in_progress":
-        return "Aceptada";
+        return "En Progreso";
       case "completed":
         return "Completada";
+      case "awaiting_rating":
+        return "Esperando Calificación";
+      case "closed":
+        return "Cerrada";
       case "cancelled":
         return "Cancelada";
       default:
@@ -266,27 +280,29 @@ export default function RequestDetailScreen({ route, navigation }: any) {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeScreen>
         <Header
           title="Detalle de Solicitud"
           showBackButton
           onBackPress={() => navigation.goBack()}
+          useSafeArea={false}
         />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
           <Text style={styles.loadingText}>Cargando detalles...</Text>
         </View>
-      </SafeAreaView>
+      </SafeScreen>
     );
   }
 
   if (!request) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeScreen>
         <Header
           title="Detalle de Solicitud"
           showBackButton
           onBackPress={() => navigation.goBack()}
+          useSafeArea={false}
         />
         <View style={styles.errorContainer}>
           <Ionicons
@@ -299,12 +315,12 @@ export default function RequestDetailScreen({ route, navigation }: any) {
             No se pudo cargar la información de la solicitud
           </Text>
         </View>
-      </SafeAreaView>
+      </SafeScreen>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeScreen>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -313,6 +329,7 @@ export default function RequestDetailScreen({ route, navigation }: any) {
           title="Detalle de Solicitud"
           showBackButton
           onBackPress={() => navigation.goBack()}
+          useSafeArea={false}
         />
 
         {/* Foto/Video del problema - PARTE SUPERIOR */}
@@ -380,25 +397,14 @@ export default function RequestDetailScreen({ route, navigation }: any) {
           <View style={styles.serviceInfoRow}>
             <View style={styles.serviceInfoItem}>
               <Ionicons
-                name="calendar-outline"
-                size={20}
-                color={theme.colors.primary}
-              />
-              <Text style={styles.serviceInfoText}>
-                {formatDateForDisplay(
-                  request.preferredDate || request.createdAt
-                )}
-              </Text>
-            </View>
-
-            <View style={styles.serviceInfoItem}>
-              <Ionicons
                 name="location-outline"
                 size={20}
                 color={theme.colors.primary}
               />
               <Text style={styles.serviceInfoText}>
-                {request.location}
+                {typeof request.location === 'object' && request.location?.address 
+                  ? request.location.address 
+                  : request.location || 'Ubicación no disponible'}
               </Text>
             </View>
 
@@ -450,7 +456,26 @@ export default function RequestDetailScreen({ route, navigation }: any) {
                   color={theme.colors.textSecondary}
                 />
                 <Text style={styles.clientInfoText}>
-                  {request.contactPhone}
+                  {(() => {
+                    const phone = request.contactPhone || request.clientId?.phone;
+                    if (!phone) return 'No disponible';
+                    
+                    // Formatear el teléfono para WhatsApp
+                    let formattedPhone = phone.toString().replace(/\s+/g, '').replace(/[()-]/g, '');
+                    
+                    // Asegurar que tenga el código de país
+                    if (!formattedPhone.startsWith('+')) {
+                      if (formattedPhone.startsWith('54')) {
+                        formattedPhone = '+' + formattedPhone;
+                      } else if (formattedPhone.length === 10) {
+                        formattedPhone = '+54' + formattedPhone;
+                      } else if (formattedPhone.length === 11 && (formattedPhone.startsWith('11') || formattedPhone.startsWith('15'))) {
+                        formattedPhone = '+54' + formattedPhone;
+                      }
+                    }
+                    
+                    return formattedPhone;
+                  })()}
                 </Text>
               </View>
             </View>
@@ -565,7 +590,7 @@ export default function RequestDetailScreen({ route, navigation }: any) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </SafeScreen>
   );
 }
 

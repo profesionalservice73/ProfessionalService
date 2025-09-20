@@ -18,6 +18,7 @@ import { theme } from '../../config/theme';
 import { Header } from '../../components/Header';
 import { useProfessional } from '../../contexts/ProfessionalContext';
 import { professionalAPI } from '../../services/api';
+import { convertImagesToBase64 } from '../../utils/imageUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -301,10 +302,31 @@ export default function EditProfileScreen({ navigation }: any) {
   const handleSave = async () => {
     if (validateForm()) {
       try {
+        // Convertir imágenes a base64 si es necesario
+        console.log('🔄 Convirtiendo imágenes a base64...');
+        const imagesToConvert = {
+          profileImage: formData.profileImage,
+          selfieImage: formData.profileImage, // Usar profileImage como selfieImage
+          dniFrontImage: formData.dniFrontImage,
+          dniBackImage: formData.dniBackImage,
+        };
+        
+        const convertedImages = await convertImagesToBase64(imagesToConvert);
+        console.log('✅ Imágenes convertidas a base64:', Object.keys(convertedImages).filter(key => (convertedImages as any)[key]));
+        
+        // Preparar datos con imágenes convertidas
+        const updateData = {
+          ...formData,
+          profileImage: (convertedImages as any).profileImage || formData.profileImage,
+          selfieImage: (convertedImages as any).selfieImage || formData.profileImage,
+          dniFrontImage: (convertedImages as any).dniFrontImage || formData.dniFrontImage,
+          dniBackImage: (convertedImages as any).dniBackImage || formData.dniBackImage,
+        };
+        
         // Actualizar en el backend
         const response = await professionalAPI.updateProfile({
           professionalId: professional?.id,
-          ...formData
+          ...updateData
         });
 
         if (response.success) {

@@ -3,12 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Image,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../../config/theme';
@@ -19,36 +19,12 @@ import { clientAPI } from '../../services/api';
 const menuItems = [
   {
     id: '1',
-    title: 'Editar Perfil',
-    icon: 'person-outline',
-    action: 'edit_profile',
-  },
-  {
-    id: '2',
-    title: 'Configuración',
-    icon: 'settings-outline',
-    action: 'settings',
-  },
-  {
-    id: '3',
-    title: 'Notificaciones',
-    icon: 'notifications-outline',
-    action: 'notifications',
-  },
-  {
-    id: '4',
-    title: 'Privacidad y Seguridad',
-    icon: 'shield-outline',
-    action: 'privacy',
-  },
-  {
-    id: '5',
     title: 'Ayuda y Soporte',
     icon: 'help-circle-outline',
     action: 'help',
   },
   {
-    id: '6',
+    id: '2',
     title: 'Acerca de',
     icon: 'information-circle-outline',
     action: 'about',
@@ -69,12 +45,42 @@ const MenuItem = ({ item, onPress }: { item: any; onPress: (action: string) => v
   );
 };
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }: any) {
   const { logout, user } = useAuth();
 
   const handleMenuPress = (action: string) => {
     console.log('Menu action:', action);
-    // Aquí se navegaría a la pantalla correspondiente
+    
+    switch (action) {
+      case 'help':
+        Alert.alert(
+          'Ayuda y Soporte',
+          '¿Necesitas ayuda? Contáctanos por correo electrónico:\n\nprofesionalservice73@gmail.com',
+          [
+            {
+              text: 'OK',
+              style: 'default',
+            },
+          ]
+        );
+        break;
+        
+      case 'about':
+        Alert.alert(
+          'Acerca de Professional Service',
+          'Professional Service es una plataforma que conecta clientes con profesionales certificados en hogar, industria y comercio.\n\nPara soporte técnico o consultas, contáctanos en:\n\nprofesionalservice73@gmail.com',
+          [
+            {
+              text: 'OK',
+              style: 'default',
+            },
+          ]
+        );
+        break;
+        
+      default:
+        console.log('Acción no reconocida:', action);
+    }
   };
 
   const handleLogout = () => {
@@ -123,7 +129,13 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
-        <Header title="Mi Perfil" />
+        <Header 
+          title="Mi Perfil" 
+          rightAction={{
+            icon: 'settings-outline',
+            onPress: () => navigation.navigate('ClientSettings')
+          }}
+        />
         
         <LinearGradient
           colors={[theme.colors.primary, theme.colors.secondary]}

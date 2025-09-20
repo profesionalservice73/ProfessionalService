@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   FlatList,
@@ -13,10 +12,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../config/theme';
 import { Header } from '../../components/Header';
+import { SafeScreen } from '../../components/SafeScreen';
 import { clientAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRequests } from '../../contexts/RequestsContext';
+import { useNotifications } from '../../contexts/NotificationContext';
+import { useClientNotifications } from '../../hooks/useClientNotifications';
 import { formatDateForDisplay } from '../../utils/dateUtils';
+import { RatingModal } from '../../components/RatingModal';
+import { CancelRequestModal } from '../../components/CancelRequestModal';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -25,6 +29,10 @@ const getStatusColor = (status: string) => {
     case 'in_progress':
       return theme.colors.primary;
     case 'completed':
+      return theme.colors.success;
+    case 'awaiting_rating':
+      return theme.colors.primary;
+    case 'closed':
       return theme.colors.success;
     case 'cancelled':
       return theme.colors.error;
@@ -41,6 +49,10 @@ const getStatusText = (status: string) => {
       return 'En Progreso';
     case 'completed':
       return 'Completado';
+    case 'awaiting_rating':
+      return 'Esperando Calificación';
+    case 'closed':
+      return 'Cerrado';
     case 'cancelled':
       return 'Cancelado';
     default:
@@ -68,12 +80,16 @@ const RequestCard = ({
   request, 
   onPress, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onRate,
+  onCancel
 }: { 
   request: any; 
   onPress: (id: string) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
+  onRate: (request: any) => void;
+  onCancel: (request: any) => void;
 }) => {
   return (
     <View style={styles.requestCard}>
@@ -97,24 +113,70 @@ const RequestCard = ({
           </View>
           <View style={styles.detailItem}>
             <Ionicons name="location-outline" size={16} color={theme.colors.textSecondary} />
-            <Text style={styles.detailText}>{request.location}</Text>
+            <Text style={styles.detailText}>
+              {typeof request.location === 'object' && request.location?.address 
+                ? request.location.address 
+                : request.location || 'Ubicación no disponible'}
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
       
       <View style={styles.requestActions}>
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => onEdit(request._id || request.id)}
-        >
-          <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => onDelete(request._id || request.id)}
-        >
-          <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
-        </TouchableOpacity>
+        {/* Botones de acción según el estado */}
+        {request.status === 'awaiting_rating' && (
+          <>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.rateButton]} 
+              onPress={() => onRate(request)}
+            >
+              <Ionicons name="star-outline" size={20} color={theme.colors.white} />
+              <Text style={styles.rateButtonText}>Calificar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.cancelButton]} 
+              onPress={() => onCancel(request)}
+            >
+              <Ionicons name="close-outline" size={20} color={theme.colors.white} />
+              <Text style={styles.cancelButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+          </>
+        )}
+        
+        {request.status === 'pending' && (
+          <>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => onEdit(request._id || request.id)}
+            >
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.actionButton} 
+              onPress={() => onCancel(request)}
+            >
+              <Ionicons name="close-outline" size={20} color={theme.colors.error} />
+            </TouchableOpacity>
+          </>
+        )}
+        
+        {['in_progress', 'completed'].includes(request.status) && (
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => onCancel(request)}
+          >
+            <Ionicons name="close-outline" size={20} color={theme.colors.error} />
+          </TouchableOpacity>
+        )}
+        
+        {['closed', 'cancelled'].includes(request.status) && (
+          <TouchableOpacity 
+            style={styles.actionButton} 
+            onPress={() => onDelete(request._id || request.id)}
+          >
+            <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -123,22 +185,40 @@ const RequestCard = ({
 export default function RequestsScreen({ navigation }: any) {
   const { user } = useAuth();
   const { requests, loading, refreshRequests } = useRequests();
+  const { clearBadge } = useNotifications();
+  const { markAsRead } = useClientNotifications();
   const [activeFilter, setActiveFilter] = useState('all');
+  
+  // Estados para los modales
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [cancelModalVisible, setCancelModalVisible] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
 
   // Recargar solicitudes cuando se regrese a esta pantalla
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       if (user?.id) {
         refreshRequests();
+        // Limpiar badge cuando el usuario entra a la pantalla de solicitudes
+        clearBadge();
       }
     });
 
     return unsubscribe;
-  }, [navigation, user?.id, refreshRequests]);
+  }, [navigation, user?.id, refreshRequests, clearBadge]);
 
+  // Asegurar que requests siempre sea un array
+  const safeRequests = Array.isArray(requests) ? requests : [];
+  
+  console.log('🔍 Requests en componente:', requests);
+  console.log('🔍 SafeRequests:', safeRequests);
+  console.log('🔍 ActiveFilter:', activeFilter);
+  
   const filteredRequests = activeFilter === 'all' 
-    ? requests 
-    : requests.filter((request: any) => request.status === activeFilter);
+    ? safeRequests 
+    : safeRequests.filter((request: any) => request.status === activeFilter);
+    
+  console.log('🔍 FilteredRequests:', filteredRequests);
 
   const handleRequestPress = (requestId: string) => {
     console.log('Request pressed:', requestId);
@@ -150,10 +230,32 @@ export default function RequestsScreen({ navigation }: any) {
     navigation.navigate('CreateRequest');
   };
 
+  const handleRateRequest = (request: any) => {
+    setSelectedRequest(request);
+    setRatingModalVisible(true);
+  };
+
+  const handleCancelRequest = (request: any) => {
+    setSelectedRequest(request);
+    setCancelModalVisible(true);
+  };
+
+  const handleRatingSuccess = () => {
+    refreshRequests();
+    setRatingModalVisible(false);
+    setSelectedRequest(null);
+  };
+
+  const handleCancelSuccess = () => {
+    refreshRequests();
+    setCancelModalVisible(false);
+    setSelectedRequest(null);
+  };
+
   const handleEditRequest = (requestId: string) => {
     
     // Buscar la solicitud para pasarla a la pantalla de edición
-    const request = requests.find(req => req._id === requestId || req.id === requestId);
+    const request = safeRequests.find(req => req._id === requestId || req.id === requestId);
     if (request) {
       console.log('Found request to edit:', request);
       navigation.navigate('EditRequest', { request });
@@ -199,18 +301,24 @@ export default function RequestsScreen({ navigation }: any) {
     { key: 'all', label: 'Todas' },
     { key: 'pending', label: 'Pendientes' },
     { key: 'in_progress', label: 'En Progreso' },
-    { key: 'completed', label: 'Completadas' },
+    { key: 'awaiting_rating', label: 'Esperando Calificación' },
+    { key: 'closed', label: 'Cerradas' },
+    { key: 'cancelled', label: 'Canceladas' },
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header con logo */}
-      <Header title="Mis Solicitudes" />
+    <SafeScreen>
+      {/* Header */}
+      <View style={styles.headerContainer}>
+        <Header 
+          title="Mis Solicitudes" 
+          useSafeArea={false} />
+      </View>
       
       {/* Botón nueva solicitud */}
       <View style={styles.newRequestContainer}>
         <TouchableOpacity style={styles.newRequestButton} onPress={handleNewRequest}>
-          <Ionicons name="add" size={24} color={theme.colors.white} />
+          <Ionicons name="add" size={20} color={theme.colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -259,6 +367,8 @@ export default function RequestsScreen({ navigation }: any) {
               onPress={handleRequestPress}
               onEdit={handleEditRequest}
               onDelete={handleDeleteRequest}
+              onRate={handleRateRequest}
+              onCancel={handleCancelRequest}
             />
           )}
           contentContainerStyle={styles.requestsList}
@@ -282,7 +392,33 @@ export default function RequestsScreen({ navigation }: any) {
           }
         />
       )}
-    </SafeAreaView>
+
+      {/* Modales */}
+      <RatingModal
+        visible={ratingModalVisible}
+        onClose={() => {
+          setRatingModalVisible(false);
+          setSelectedRequest(null);
+        }}
+        onSuccess={handleRatingSuccess}
+        requestId={selectedRequest?._id || selectedRequest?.id || ''}
+        clientId={user?.id || ''}
+        professionalName={selectedRequest?.professionalId?.userId?.fullName || 'Profesional'}
+        serviceTitle={selectedRequest?.title || ''}
+      />
+
+      <CancelRequestModal
+        visible={cancelModalVisible}
+        onClose={() => {
+          setCancelModalVisible(false);
+          setSelectedRequest(null);
+        }}
+        onSuccess={handleCancelSuccess}
+        requestId={selectedRequest?._id || selectedRequest?.id || ''}
+        clientId={user?.id || ''}
+        serviceTitle={selectedRequest?.title || ''}
+      />
+    </SafeScreen>
   );
 }
 
@@ -291,16 +427,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: theme.spacing.md,
+  },
   newRequestContainer: {
     position: 'absolute',
-    top: theme.spacing.xl + 47,
+    top: theme.spacing.xl + 60,
     right: theme.spacing.lg,
     zIndex: 1,
   },
   newRequestButton: {
     backgroundColor: theme.colors.primary,
-    width: 40,
-    height: 40,
+    width: 35,
+    height: 35,
     borderRadius: theme.borderRadius.full,
     alignItems: 'center',
     justifyContent: 'center',
@@ -453,6 +595,26 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rateButton: {
+    backgroundColor: theme.colors.primary,
+    borderRightWidth: 1,
+    borderRightColor: theme.colors.border,
+  },
+  rateButtonText: {
+    color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  cancelButton: {
+    backgroundColor: theme.colors.error,
+  },
+  cancelButtonText: {
+    color: theme.colors.white,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
   },
   loadingContainer: {
     flex: 1,

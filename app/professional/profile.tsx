@@ -17,19 +17,61 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useProfessional } from '../../contexts/ProfessionalContext';
 import { professionalAPI } from '../../services/api';
 import { ProfessionalReviewsSection } from '../../components/ProfessionalReviewsSection';
+import { useIsFocused } from '@react-navigation/native';
 
 export default function ProfessionalProfileScreen({ navigation }: any) {
   const { logout, user } = useAuth();
   const { professional } = useProfessional();
+  const isFocused = useIsFocused();
   const [isAvailable, setIsAvailable] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [profileStats, setProfileStats] = useState({
+    totalRequests: 0,
+    completedRequests: 0,
+    totalEarnings: 0,
+    satisfiedClients: 0
+  });
 
   // Cargar datos del perfil
   useEffect(() => {
     if (professional) {
       setIsAvailable(professional.availability !== 'No disponible');
+      loadProfileStats();
     }
   }, [professional]);
+
+  // Recargar estadísticas cuando la pantalla esté enfocada
+  useEffect(() => {
+    if (isFocused && professional?.id && user?.id) {
+      loadProfileStats();
+    }
+  }, [isFocused, professional?.id, user?.id]);
+
+  const loadProfileStats = async () => {
+    if (!professional?.id || !user?.id) return;
+    
+    try {
+      console.log('📊 Loading profile stats for professional ID:', professional.id);
+      console.log('📊 User ID:', user.id);
+      console.log('📊 Professional object:', professional);
+      
+      // Usar getProfileByUserId como lo hace el contexto, que sabemos que funciona
+      const response = await professionalAPI.getProfileByUserId(user.id);
+      console.log('📊 Profile API response:', JSON.stringify(response, null, 2));
+      
+      if (response.success && response.data?.stats) {
+        console.log('📊 Setting profile stats:', response.data.stats);
+        setProfileStats(response.data.stats);
+      } else {
+        console.log('📊 No stats found in response. Full response:', response);
+        console.log('📊 Response success:', response.success);
+        console.log('📊 Response data:', response.data);
+        console.log('📊 Response data.stats:', response.data?.stats);
+      }
+    } catch (error) {
+      console.error('Error loading profile stats:', error);
+    }
+  };
 
   const handleAvailabilityChange = async (newAvailability: boolean) => {
     if (!professional?.id) return;
@@ -41,7 +83,7 @@ export default function ProfessionalProfileScreen({ navigation }: any) {
       const availabilityText = newAvailability ? 'Disponible' : 'No disponible';
       
       // Actualización en segundo plano sin bloquear la UI
-      const response = await professionalAPI.updateAvailability(professional.id, availabilityText);
+      const response = await professionalAPI.updateProfile(professional.id, { availability: availabilityText });
       
       if (!response.success) {
         // Solo revertir si falló, sin mostrar alert molesto
@@ -80,14 +122,18 @@ export default function ProfessionalProfileScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Header title="Mi Perfil" />
+        <Header title="Mi Perfil"
+          rightAction={{
+            icon: 'settings-outline',
+            onPress: () => navigation.navigate('Settings')
+          }} />
 
         <View style={styles.profileSection}>
           <View style={styles.profileHeader}>
             <Ionicons name="person-circle" size={80} color={theme.colors.primary} />
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>{professional?.name || 'Cargando...'}</Text>
-              <Text style={styles.profileSpecialty}>{professional?.specialty || 'Especialidad'}</Text>
+              <Text style={styles.profileSpecialty}>{professional?.specialties?.[0] || 'Especialidad'}</Text>
               <View style={styles.ratingContainer}>
                 <Ionicons name="star" size={16} color={theme.colors.warning} />
                 <Text style={styles.ratingText}>
@@ -117,7 +163,7 @@ export default function ProfessionalProfileScreen({ navigation }: any) {
           <Text style={styles.sectionTitle}>Estadísticas</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{professional?.totalReviews || 0}</Text>
+              <Text style={styles.statValue}>{profileStats.completedRequests}</Text>
               <Text style={styles.statTitle}>Trabajos Completados</Text>
             </View>
             <View style={styles.statCard}>
@@ -125,11 +171,11 @@ export default function ProfessionalProfileScreen({ navigation }: any) {
               <Text style={styles.statTitle}>Calificación</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>$0</Text>
+              <Text style={styles.statValue}>${profileStats.totalEarnings}</Text>
               <Text style={styles.statTitle}>Ingresos Totales</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{professional?.totalReviews || 0}</Text>
+              <Text style={styles.statValue}>{profileStats.satisfiedClients}</Text>
               <Text style={styles.statTitle}>Clientes Satisfechos</Text>
             </View>
           </View>

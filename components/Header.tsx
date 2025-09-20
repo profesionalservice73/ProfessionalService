@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '../config/theme';
 
 interface HeaderProps {
@@ -9,9 +10,11 @@ interface HeaderProps {
   showBackButton?: boolean;
   onBackPress?: () => void;
   rightAction?: {
-    text: string;
+    text?: string;
+    icon?: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
   };
+  useSafeArea?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({ 
@@ -19,8 +22,10 @@ export const Header: React.FC<HeaderProps> = ({
   showLogo = true,
   showBackButton = false,
   onBackPress,
-  rightAction
+  rightAction,
+  useSafeArea = true
 }) => {
+  const insets = useSafeAreaInsets();
   // Lógica inteligente para determinar qué mostrar en cada sección
   const renderLeftSection = () => {
     if (showBackButton) {
@@ -57,7 +62,11 @@ export const Header: React.FC<HeaderProps> = ({
           style={styles.actionButton} 
           onPress={rightAction.onPress}
         >
-          <Text style={styles.actionButtonText}>{rightAction.text}</Text>
+          {rightAction.icon ? (
+            <Ionicons name={rightAction.icon} size={24} color={theme.colors.primary} />
+          ) : (
+            <Text style={styles.actionButtonText}>{rightAction.text}</Text>
+          )}
         </TouchableOpacity>
       );
     }
@@ -79,8 +88,12 @@ export const Header: React.FC<HeaderProps> = ({
     return null;
   };
 
+  const headerStyle = useSafeArea 
+    ? [styles.header, { paddingTop: insets.top + theme.spacing.md }]
+    : styles.header;
+
   return (
-    <View style={styles.header}>
+    <View style={headerStyle}>
       <View style={styles.leftSection}>
         {renderLeftSection()}
       </View>
@@ -103,11 +116,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
-    paddingTop: theme.spacing.xl + 40,
     backgroundColor: theme.colors.background,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
-    minHeight: 80,
+    minHeight: 60,
   },
   leftSection: {
     flexDirection: 'row',
@@ -135,22 +147,22 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.colors.white,
+    borderRadius: theme.borderRadius.md,
     padding: theme.spacing.xs,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 2,
+    elevation: 2,
   },
   logo: {
-    width: 45,
-    height: 45,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 8,
   },
   title: {
     fontSize: 20,

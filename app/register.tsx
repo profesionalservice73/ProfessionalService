@@ -26,9 +26,9 @@ import { Header } from "../components/Header";
 import { EnhancedServiceIcon } from "../components/EnhancedServiceIcon";
 import { useProfessional } from "../contexts/ProfessionalContext";
 import { professionalAPI, authAPI } from "../services/api";
-import { ImageValidationService } from "../services/imageValidation";
 import { KYCFlow } from "../components/KYCFlow";
 import { CountryPhoneInput } from "../components/CountryPhoneInput";
+import { convertImagesToBase64 } from "../utils/imageUtils";
 
 // Datos para el formulario de profesionales
 const categories = [
@@ -81,19 +81,11 @@ export default function RegisterScreen({ navigation }: any) {
   const [kycCompleted, setKycCompleted] = useState(false);
   const [kycData, setKycData] = useState<any>(null);
 
-  // Estado para el flujo de verificación inicial
-  const [verificationStep, setVerificationStep] = useState(1);
-  const [verificationComplete, setVerificationComplete] = useState(false);
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
-  const [verificationData, setVerificationData] = useState({
+  // Estado para documentos (sin validaciones)
+  const [documentImages, setDocumentImages] = useState({
     dniFront: null as string | null,
     dniBack: null as string | null,
     profilePhoto: null as string | null,
-  });
-  const [verificationStatus, setVerificationStatus] = useState({
-    dniFront: "pending" as "pending" | "verifying" | "verified" | "failed",
-    dniBack: "pending" as "pending" | "verifying" | "verified" | "failed",
-    profilePhoto: "pending" as "pending" | "verifying" | "verified" | "failed",
   });
 
   // Estados para el formulario de cliente
@@ -285,11 +277,11 @@ export default function RegisterScreen({ navigation }: any) {
     }
   };
 
-  // Funciones para verificación inicial
-  const takeVerificationPhoto = async (
+  // Funciones para captura de imágenes (sin validaciones)
+  const captureImage = async (
     field: "dniFront" | "dniBack" | "profilePhoto"
   ) => {
-    console.log("🔍 takeVerificationPhoto llamado con field:", field);
+    console.log("🔍 captureImage llamado con field:", field);
 
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -310,55 +302,20 @@ export default function RegisterScreen({ navigation }: any) {
     if (!result.canceled && result.assets[0]) {
       const imageUri = result.assets[0].uri;
 
-      // Validar la imagen INMEDIATAMENTE según el tipo
-      let validationResult;
-      if (field === "profilePhoto") {
-        validationResult = await ImageValidationService.validateProfileImage(
-          imageUri
-        );
-      } else {
-        // Para DNI front y back
-        validationResult = await ImageValidationService.validateDNIImage(
-          imageUri
-        );
-      }
+      // Guardar imagen directamente
+      setDocumentImages((prev) => ({
+        ...prev,
+        [field]: imageUri,
+      }));
 
-      // Mostrar resultado de validación INMEDIATO
-      const isValid = ImageValidationService.showValidationAlert(
-        validationResult,
-        field === "profilePhoto" ? "profile" : "dni"
-      );
-
-      if (isValid) {
-        // Solo guardar la imagen si es válida
-        setVerificationData((prev) => ({
-          ...prev,
-          [field]: imageUri,
-        }));
-
-        // Marcar como verificada inmediatamente
-        setVerificationStatus((prev) => ({ ...prev, [field]: "verified" }));
-
-        console.log(
-          `✅ Foto ${field} validada y guardada INMEDIATAMENTE:`,
-          imageUri
-        );
-      } else {
-        // Foto rechazada - NO se guarda nada
-        console.log(`❌ Foto ${field} rechazada por validación INMEDIATA`);
-        Alert.alert(
-          "Foto Rechazada",
-          "La foto no cumple con los requisitos. Por favor, toma otra foto que cumpla con las especificaciones.",
-          [{ text: "Entendido" }]
-        );
-      }
+      console.log(`✅ Imagen ${field} capturada:`, imageUri);
     }
   };
 
-  const selectVerificationImage = async (
+  const selectImageFromGallery = async (
     field: "dniFront" | "dniBack" | "profilePhoto"
   ) => {
-    console.log("🔍 selectVerificationImage llamado con field:", field);
+    console.log("🔍 selectImageFromGallery llamado con field:", field);
 
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
@@ -379,84 +336,28 @@ export default function RegisterScreen({ navigation }: any) {
     if (!result.canceled && result.assets[0]) {
       const imageUri = result.assets[0].uri;
 
-      // Validar la imagen INMEDIATAMENTE según el tipo
-      let validationResult;
-      if (field === "profilePhoto") {
-        validationResult = await ImageValidationService.validateProfileImage(
-          imageUri
-        );
-      } else {
-        // Para DNI front y back
-        validationResult = await ImageValidationService.validateDNIImage(
-          imageUri
-        );
-      }
+      // Guardar imagen directamente
+      setDocumentImages((prev) => ({
+        ...prev,
+        [field]: imageUri,
+      }));
 
-      // Mostrar resultado de validación INMEDIATO
-      const isValid = ImageValidationService.showValidationAlert(
-        validationResult,
-        field === "profilePhoto" ? "profile" : "dni"
-      );
-
-      if (isValid) {
-        // Solo guardar la imagen si es válida
-        setVerificationData((prev) => ({
-          ...prev,
-          [field]: imageUri,
-        }));
-
-        // Marcar como verificada inmediatamente
-        setVerificationStatus((prev) => ({ ...prev, [field]: "verified" }));
-
-        console.log(
-          `✅ Imagen ${field} validada y guardada INMEDIATAMENTE:`,
-          imageUri
-        );
-      } else {
-        // Imagen rechazada - NO se guarda nada
-        console.log(`❌ Imagen ${field} rechazada por validación INMEDIATA`);
-        Alert.alert(
-          "Imagen Rechazada",
-          "La imagen no cumple con los requisitos. Por favor, selecciona otra imagen que cumpla con las especificaciones.",
-          [{ text: "Entendido" }]
-        );
-      }
+      console.log(`✅ Imagen ${field} seleccionada:`, imageUri);
     }
   };
 
-  const handleVerificationNext = () => {
-    if (verificationStep < 3) {
-      setVerificationStep(verificationStep + 1);
-    } else {
-      // Verificar que todos los documentos estén verificados
-      const allVerified = Object.values(verificationStatus).every(
-        (status) => status === "verified"
-      );
-
-      if (allVerified) {
-        setVerificationComplete(true);
-        setShowVerificationModal(false);
-        // Transferir la foto de perfil al formulario
-        setProfessionalFormData((prev) => ({
-          ...prev,
-          profilePhoto: verificationData.profilePhoto,
-        }));
-        // Resetear el paso de verificación para futuros usos
-        setVerificationStep(1);
-      } else {
-        Alert.alert(
-          "Verificación Pendiente",
-          "Todos los documentos deben estar verificados antes de continuar."
-        );
-      }
-    }
+  // Función simplificada para continuar sin validaciones
+  const handleDocumentsComplete = () => {
+    // Transferir las imágenes al formulario profesional
+    setProfessionalFormData((prev) => ({
+      ...prev,
+      profilePhoto: documentImages.profilePhoto,
+    }));
+    
+    // Continuar con el flujo normal
+    // setShowVerificationModal(false); // Eliminado - ya no se usa
   };
 
-  const handleVerificationBack = () => {
-    if (verificationStep > 1) {
-      setVerificationStep(verificationStep - 1);
-    }
-  };
 
   const handleRemoveService = (index: number) => {
     setProfessionalFormData((prev) => ({
@@ -577,183 +478,7 @@ export default function RegisterScreen({ navigation }: any) {
     return true;
   };
 
-  const selectImage = async (type: "profile" | "dni_front" | "dni_back") => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
 
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: type === "profile" ? [1, 1] : [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-
-        // Validar la imagen INMEDIATAMENTE según el tipo
-        let validationResult;
-        if (type === "profile") {
-          validationResult = await ImageValidationService.validateProfileImage(
-            imageUri
-          );
-        } else {
-          // Para DNI front y back
-          validationResult = await ImageValidationService.validateDNIImage(
-            imageUri
-          );
-        }
-
-        // Mostrar resultado de validación INMEDIATO
-        const isValid = ImageValidationService.showValidationAlert(
-          validationResult,
-          type === "profile" ? "profile" : "dni"
-        );
-
-        if (isValid) {
-          // Solo guardar la imagen si es válida
-          if (type === "profile") {
-            setProfileImage(imageUri);
-            setVerificationData((prev) => ({
-              ...prev,
-              profilePhoto: imageUri,
-            }));
-            setVerificationStatus((prev) => ({
-              ...prev,
-              profilePhoto: "verified",
-            }));
-            console.log(
-              `✅ Imagen ${type} validada y guardada INMEDIATAMENTE:`,
-              imageUri
-            );
-          } else if (type === "dni_front") {
-            setDniFrontImage(imageUri);
-            setVerificationData((prev) => ({ ...prev, dniFront: imageUri }));
-            setVerificationStatus((prev) => ({
-              ...prev,
-              dniFront: "verified",
-            }));
-            console.log(
-              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
-              imageUri
-            );
-          } else if (type === "dni_back") {
-            setDniBackImage(imageUri);
-            setVerificationData((prev) => ({ ...prev, dniBack: imageUri }));
-            setVerificationStatus((prev) => ({ ...prev, dniBack: "verified" }));
-            console.log(
-              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
-              imageUri
-            );
-          }
-        } else {
-          // Imagen rechazada - NO se guarda nada
-          console.log(`❌ Imagen ${type} rechazada por validación INMEDIATA`);
-          Alert.alert(
-            "Imagen Rechazada",
-            "La imagen no cumple con los requisitos. Por favor, selecciona otra imagen que cumpla con las especificaciones.",
-            [{ text: "Entendido" }]
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Error selecting image:", error);
-      Alert.alert("Error", "No se pudo seleccionar la imagen");
-    }
-  };
-
-  const takePhoto = async (type: "profile" | "dni_front" | "dni_back") => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permisos Requeridos",
-        "Necesitamos acceso a tu cámara para tomar fotos.",
-        [{ text: "OK" }]
-      );
-      return;
-    }
-
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: type === "profile" ? [1, 1] : [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-
-        // Validar la imagen INMEDIATAMENTE según el tipo
-        let validationResult;
-        if (type === "profile") {
-          validationResult = await ImageValidationService.validateProfileImage(
-            imageUri
-          );
-        } else {
-          // Para DNI front y back
-          validationResult = await ImageValidationService.validateDNIImage(
-            imageUri
-          );
-        }
-
-        // Mostrar resultado de validación INMEDIATO
-        const isValid = ImageValidationService.showValidationAlert(
-          validationResult,
-          type === "profile" ? "profile" : "dni"
-        );
-
-        if (isValid) {
-          // Solo guardar la imagen si es válida
-          if (type === "profile") {
-            setProfileImage(imageUri);
-            setVerificationData((prev) => ({
-              ...prev,
-              profilePhoto: imageUri,
-            }));
-            setVerificationStatus((prev) => ({
-              ...prev,
-              profilePhoto: "verified",
-            }));
-            console.log(
-              `✅ Foto ${type} validada y guardada INMEDIATAMENTE:`,
-              imageUri
-            );
-          } else if (type === "dni_front") {
-            setDniFrontImage(imageUri);
-            setVerificationData((prev) => ({ ...prev, dniFront: imageUri }));
-            setVerificationStatus((prev) => ({
-              ...prev,
-              dniFront: "verified",
-            }));
-            console.log(
-              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
-              imageUri
-            );
-          } else if (type === "dni_back") {
-            setDniBackImage(imageUri);
-            setVerificationData((prev) => ({ ...prev, dniBack: imageUri }));
-            setVerificationStatus((prev) => ({ ...prev, dniBack: "verified" }));
-            console.log(
-              `✅ DNI ${type} validado y guardado INMEDIATAMENTE:`,
-              imageUri
-            );
-          }
-        } else {
-          // Foto rechazada - NO se guarda nada
-          console.log(`❌ Foto ${type} rechazada por validación INMEDIATA`);
-          Alert.alert(
-            "Foto Rechazada",
-            "La foto no cumple con los requisitos. Por favor, toma otra foto que cumpla con las especificaciones.",
-            [{ text: "Entendido" }]
-          );
-        }
-      }
-    } catch (error) {
-      console.error("Error taking photo:", error);
-      Alert.alert("Error", "No se pudo tomar la foto");
-    }
-  };
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -953,7 +678,7 @@ export default function RegisterScreen({ navigation }: any) {
         // Log para debugging
         console.log("Enviando datos del profesional:", {
           formData: professionalFormData,
-          verificationData: verificationData,
+          documentImages: documentImages,
         });
 
         // Log detallado de cada campo
@@ -967,8 +692,8 @@ export default function RegisterScreen({ navigation }: any) {
           description: !!professionalFormData.description,
           location: !!professionalFormData.location,
           profilePhoto: !!professionalFormData.profilePhoto,
-          dniFront: !!verificationData.dniFront,
-          dniBack: !!verificationData.dniBack,
+          dniFront: !!documentImages.dniFront,
+          dniBack: !!documentImages.dniBack,
         });
 
         // Paso 1: Registrar usuario básico
@@ -1011,6 +736,19 @@ export default function RegisterScreen({ navigation }: any) {
 
         // Paso 2: Crear perfil profesional
         console.log('🟢 Paso 2: Creando perfil profesional...');
+        
+        // Convertir imágenes a base64
+        console.log('🔄 Convirtiendo imágenes a base64...');
+        const imagesToConvert = {
+          profileImage: kycData?.selfieUri || professionalFormData.profilePhoto,
+          selfieImage: kycData?.selfieUri || professionalFormData.profilePhoto,
+          dniFrontImage: kycData?.dniFrontUri || documentImages.dniFront,
+          dniBackImage: kycData?.dniBackUri || documentImages.dniBack,
+        };
+        
+        const convertedImages = await convertImagesToBase64(imagesToConvert);
+        console.log('✅ Imágenes convertidas a base64:', Object.keys(convertedImages).filter(key => (convertedImages as any)[key]));
+        
         const professionalData = {
           userId: userRegisterResult.data.id,
           specialties: professionalFormData.specialties,
@@ -1019,9 +757,10 @@ export default function RegisterScreen({ navigation }: any) {
           location: professionalFormData.location,
           availability: professionalFormData.availability,
           responseTime: professionalFormData.responseTime,
-          profileImage: kycData?.selfieUri || professionalFormData.profilePhoto,
-          dniFrontImage: kycData?.dniFrontUri || verificationData.dniFront,
-          dniBackImage: kycData?.dniBackUri || verificationData.dniBack,
+          profileImage: (convertedImages as any).profileImage,
+          selfieImage: (convertedImages as any).selfieImage,
+          dniFrontImage: (convertedImages as any).dniFrontImage,
+          dniBackImage: (convertedImages as any).dniBackImage,
           services: professionalFormData.services,
           priceRange: professionalFormData.priceRange,
           certifications: professionalFormData.certifications,
@@ -1063,9 +802,11 @@ export default function RegisterScreen({ navigation }: any) {
         }
       } catch (error) {
         console.error('💥 Error completo en el registro:', error);
-        console.error('💥 Error message:', error.message);
-        console.error('💥 Error stack:', error.stack);
-        Alert.alert("Error", `Error de conexión al completar el registro: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+        const errorStack = error instanceof Error ? error.stack : 'No hay stack trace';
+        console.error('💥 Error message:', errorMessage);
+        console.error('💥 Error stack:', errorStack);
+        Alert.alert("Error", `Error de conexión al completar el registro: ${errorMessage}`);
       } finally {
         setProfessionalLoading(false);
       }
@@ -1448,8 +1189,8 @@ export default function RegisterScreen({ navigation }: any) {
         </View>
       )}
 
-      {/* Foto de perfil (si ya se subió en verificación) */}
-      {verificationComplete && professionalFormData.profilePhoto && (
+      {/* Foto de perfil (si ya se subió) */}
+      {professionalFormData.profilePhoto && (
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Foto de Perfil</Text>
           <View style={styles.profilePhotoContainer}>
@@ -1926,12 +1667,10 @@ export default function RegisterScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.verificationBackButton}
               onPress={() => {
-                setShowVerificationModal(false);
+                // Cerrar modal y resetear
                 setRoleSelected(false);
                 setSelectedRole(null);
-                setVerificationComplete(false);
-                setVerificationStep(1);
-                setVerificationData({
+                setDocumentImages({
                   dniFront: null,
                   dniBack: null,
                   profilePhoto: null,
@@ -1946,21 +1685,10 @@ export default function RegisterScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View
-                style={[
-                  styles.progressFill,
-                  { width: `${(verificationStep / 3) * 100}%` },
-                ]}
-              />
-            </View>
-          </View>
 
           {/* Form Steps */}
           <View style={styles.verificationFormContainer}>
-            {verificationStep === 1 && (
+            {true && (
               <View style={styles.stepContainer}>
                 <View style={styles.stepHeader}>
                   <Ionicons
@@ -1979,56 +1707,23 @@ export default function RegisterScreen({ navigation }: any) {
                     {"\n"}• Asegúrate de que todo el texto sea legible
                     {"\n"}• Evita sombras, reflejos o cortes
                     {"\n"}• Usa buena iluminación
-                    {"\n"}• La validación se realiza INMEDIATAMENTE al subir la
-                    imagen
                   </Text>
                 </View>
 
                 <View style={styles.documentUploadContainer}>
-                  {verificationData.dniFront ? (
+                  {documentImages.dniFront ? (
                     <View style={styles.imagePreviewContainer}>
                       <Image
-                        source={{ uri: verificationData.dniFront }}
+                        source={{ uri: documentImages.dniFront }}
                         style={styles.imagePreview}
                       />
-
-                      {/* Estado de verificación */}
-                      <View style={styles.verificationStatusContainer}>
-                        {verificationStatus.dniFront === "verifying" && (
-                          <View style={styles.verifyingStatus}>
-                            <ActivityIndicator
-                              size="small"
-                              color={theme.colors.primary}
-                            />
-                            <Text style={styles.verifyingText}>
-                              Verificando...
-                            </Text>
-                          </View>
-                        )}
-                        {verificationStatus.dniFront === "verified" && (
-                          <View style={styles.verifiedStatus}>
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={20}
-                              color={theme.colors.success}
-                            />
-                            <Text style={styles.verifiedText}>
-                              Verificado ✓
-                            </Text>
-                          </View>
-                        )}
-                      </View>
 
                       <TouchableOpacity
                         style={styles.removeImageButton}
                         onPress={() => {
-                          setVerificationData((prev) => ({
+                          setDocumentImages((prev) => ({
                             ...prev,
                             dniFront: null,
-                          }));
-                          setVerificationStatus((prev) => ({
-                            ...prev,
-                            dniFront: "pending",
                           }));
                         }}
                       >
@@ -2043,7 +1738,7 @@ export default function RegisterScreen({ navigation }: any) {
                     <View style={styles.uploadButtonsContainer}>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => takeVerificationPhoto("dniFront")}
+                        onPress={() => captureImage("dniFront")}
                       >
                         <Ionicons
                           name="camera"
@@ -2054,7 +1749,7 @@ export default function RegisterScreen({ navigation }: any) {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => selectVerificationImage("dniFront")}
+                        onPress={() => selectImageFromGallery("dniFront")}
                       >
                         <Ionicons
                           name="images"
@@ -2069,7 +1764,7 @@ export default function RegisterScreen({ navigation }: any) {
               </View>
             )}
 
-            {verificationStep === 2 && (
+            {true && (
               <View style={styles.stepContainer}>
                 <View style={styles.stepHeader}>
                   <Ionicons
@@ -2088,56 +1783,23 @@ export default function RegisterScreen({ navigation }: any) {
                     {"\n"}• Asegúrate de que todo el texto sea legible
                     {"\n"}• Evita sombras, reflejos o cortes
                     {"\n"}• Usa buena iluminación
-                    {"\n"}• La validación se realiza INMEDIATAMENTE al subir la
-                    imagen
                   </Text>
                 </View>
 
                 <View style={styles.documentUploadContainer}>
-                  {verificationData.dniBack ? (
+                  {documentImages.dniBack ? (
                     <View style={styles.imagePreviewContainer}>
                       <Image
-                        source={{ uri: verificationData.dniBack }}
+                        source={{ uri: documentImages.dniBack }}
                         style={styles.imagePreview}
                       />
-
-                      {/* Estado de verificación */}
-                      <View style={styles.verificationStatusContainer}>
-                        {verificationStatus.dniBack === "verifying" && (
-                          <View style={styles.verifyingStatus}>
-                            <ActivityIndicator
-                              size="small"
-                              color={theme.colors.primary}
-                            />
-                            <Text style={styles.verifyingText}>
-                              Verificando...
-                            </Text>
-                          </View>
-                        )}
-                        {verificationStatus.dniBack === "verified" && (
-                          <View style={styles.verifiedStatus}>
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={20}
-                              color={theme.colors.success}
-                            />
-                            <Text style={styles.verifiedText}>
-                              Verificado ✓
-                            </Text>
-                          </View>
-                        )}
-                      </View>
 
                       <TouchableOpacity
                         style={styles.removeImageButton}
                         onPress={() => {
-                          setVerificationData((prev) => ({
+                          setDocumentImages((prev) => ({
                             ...prev,
                             dniBack: null,
-                          }));
-                          setVerificationStatus((prev) => ({
-                            ...prev,
-                            dniBack: "pending",
                           }));
                         }}
                       >
@@ -2152,7 +1814,7 @@ export default function RegisterScreen({ navigation }: any) {
                     <View style={styles.uploadButtonsContainer}>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => takeVerificationPhoto("dniBack")}
+                        onPress={() => captureImage("dniBack")}
                       >
                         <Ionicons
                           name="camera"
@@ -2163,7 +1825,7 @@ export default function RegisterScreen({ navigation }: any) {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => selectVerificationImage("dniBack")}
+                        onPress={() => selectImageFromGallery("dniBack")}
                       >
                         <Ionicons
                           name="images"
@@ -2178,7 +1840,7 @@ export default function RegisterScreen({ navigation }: any) {
               </View>
             )}
 
-            {verificationStep === 3 && (
+            {true && (
               <View style={styles.stepContainer}>
                 <View style={styles.stepHeader}>
                   <Ionicons
@@ -2198,56 +1860,23 @@ export default function RegisterScreen({ navigation }: any) {
                     {"\n"}• Usa buena iluminación natural
                     {"\n"}• Evita sombras o reflejos
                     {"\n"}• No uses filtros o efectos
-                    {"\n"}• La validación se realiza INMEDIATAMENTE al subir la
-                    imagen
                   </Text>
                 </View>
 
-                <View style={styles.documentUploadContainer}>
-                  {verificationData.profilePhoto ? (
+                <View style={styles.profilePhotoUploadContainer}>
+                  {documentImages.profilePhoto ? (
                     <View style={styles.imagePreviewContainer}>
                       <Image
-                        source={{ uri: verificationData.profilePhoto }}
+                        source={{ uri: documentImages.profilePhoto }}
                         style={styles.imagePreview}
                       />
-
-                      {/* Estado de verificación */}
-                      <View style={styles.verificationStatusContainer}>
-                        {verificationStatus.profilePhoto === "verifying" && (
-                          <View style={styles.verifyingStatus}>
-                            <ActivityIndicator
-                              size="small"
-                              color={theme.colors.primary}
-                            />
-                            <Text style={styles.verifyingText}>
-                              Verificando...
-                            </Text>
-                          </View>
-                        )}
-                        {verificationStatus.profilePhoto === "verified" && (
-                          <View style={styles.verifiedStatus}>
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={20}
-                              color={theme.colors.success}
-                            />
-                            <Text style={styles.verifiedText}>
-                              Verificado ✓
-                            </Text>
-                          </View>
-                        )}
-                      </View>
 
                       <TouchableOpacity
                         style={styles.removeImageButton}
                         onPress={() => {
-                          setVerificationData((prev) => ({
+                          setDocumentImages((prev) => ({
                             ...prev,
                             profilePhoto: null,
-                          }));
-                          setVerificationStatus((prev) => ({
-                            ...prev,
-                            profilePhoto: "pending",
                           }));
                         }}
                       >
@@ -2262,7 +1891,7 @@ export default function RegisterScreen({ navigation }: any) {
                     <View style={styles.uploadButtonsContainer}>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => takeVerificationPhoto("profilePhoto")}
+                        onPress={() => captureImage("profilePhoto")}
                       >
                         <Ionicons
                           name="camera"
@@ -2273,7 +1902,7 @@ export default function RegisterScreen({ navigation }: any) {
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.uploadButton}
-                        onPress={() => selectVerificationImage("profilePhoto")}
+                        onPress={() => selectImageFromGallery("profilePhoto")}
                       >
                         <Ionicons
                           name="images"
@@ -2291,34 +1920,11 @@ export default function RegisterScreen({ navigation }: any) {
 
           {/* Footer con botones */}
           <View style={styles.footer}>
-            {verificationStep > 1 && (
-              <TouchableOpacity
-                style={styles.backButtonFooter}
-                onPress={handleVerificationBack}
-              >
-                <Text style={styles.backButtonText}>Atrás</Text>
-              </TouchableOpacity>
-            )}
-            {verificationStep > 1 && <View style={styles.buttonSpacer} />}
             <TouchableOpacity
-              style={[
-                styles.nextButton,
-                verificationStep === 1 && styles.nextButtonFull,
-              ]}
-              onPress={handleVerificationNext}
-              disabled={
-                !verificationData[
-                  verificationStep === 1
-                    ? "dniFront"
-                    : verificationStep === 2
-                    ? "dniBack"
-                    : "profilePhoto"
-                ]
-              }
+              style={styles.nextButton}
+              onPress={handleDocumentsComplete}
             >
-              <Text style={styles.nextButtonText}>
-                {verificationStep === 3 ? "Finalizar" : "Siguiente"}
-              </Text>
+              <Text style={styles.nextButtonText}>Continuar</Text>
               <Ionicons
                 name="arrow-forward"
                 size={20}
@@ -2935,7 +2541,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 20,
     paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.xl + 20,
+    paddingBottom: theme.spacing.xxl + 40,
     width: "100%",
     alignSelf: "center",
   },
@@ -2979,6 +2585,11 @@ const styles = StyleSheet.create({
   // Estilos para documentos
   documentUploadContainer: {
     marginTop: theme.spacing.md,
+  },
+  profilePhotoUploadContainer: {
+    marginTop: theme.spacing.xl,
+    marginBottom: theme.spacing.xl,
+    paddingVertical: theme.spacing.lg,
   },
   uploadLabel: {
     fontSize: 14,
@@ -3029,7 +2640,7 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     padding: theme.spacing.xl,
-    paddingTop: theme.spacing.xxl + 60,
+    paddingTop: theme.spacing.xxl + 80,
     paddingBottom: theme.spacing.xl,
     alignItems: "center",
     position: "relative",
@@ -3067,7 +2678,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     padding: theme.spacing.xl,
-    paddingBottom: theme.spacing.xxl + 20,
+    paddingBottom: theme.spacing.xxl + 40,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.white,

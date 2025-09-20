@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,21 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { theme } from '../../config/theme';
 import { Input } from '../../components/Input';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
+import { useRequests } from '../../contexts/RequestsContext';
 import { clientAPI } from '../../services/api';
+import googlePlacesService from '../../services/googlePlacesService';
+import { AddressAutocompleteSimple } from '../../components/AddressAutocompleteSimple';
 
 export default function CreateRequestScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const { user } = useAuth();
+  const { addNewRequest } = useRequests();
+  const { categoryId } = (route.params as any) || {};
   const [formData, setFormData] = useState({
-    title: '',
+    urgency: '',
     description: '',
     serviceType: '',
     location: '',
@@ -29,6 +35,19 @@ export default function CreateRequestScreen() {
   });
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
+
+
+  // Establecer automáticamente el tipo de servicio si viene desde una categoría
+  useEffect(() => {
+    if (categoryId) {
+      // Buscar la categoría por ID
+      const category = categories.find(cat => cat.id === categoryId);
+      if (category) {
+        updateFormData('serviceType', category.name);
+      }
+    }
+  }, [categoryId]);
 
   const updateFormData = (field: string, value: string | string[]) => {
     setFormData(prev => ({
@@ -72,8 +91,13 @@ export default function CreateRequestScreen() {
     updateFormData('images', []);
   };
 
+  const handlePlaceSelected = (placeDetails: any) => {
+    console.log('📍 Lugar seleccionado:', placeDetails);
+    setSelectedPlace(placeDetails);
+  };
+
   const handleSubmit = async () => {
-    if (!formData.title || !formData.description || !formData.serviceType || !formData.location) {
+    if (!formData.urgency || !formData.description || !formData.serviceType || !formData.location) {
       Alert.alert('Error', 'Por favor completa todos los campos obligatorios');
       return;
     }
@@ -86,25 +110,81 @@ export default function CreateRequestScreen() {
     setIsSubmitting(true);
 
     try {
+      // Obtener coordenadas reales para la ubicación
+      console.log('🗺️ Obteniendo coordenadas para la ubicación...');
+      let locationData;
+      
+      // Si hay un lugar seleccionado, usar sus coordenadas
+      if (selectedPlace && selectedPlace.coordinates) {
+        locationData = {
+          coordinates: selectedPlace.coordinates,
+          address: selectedPlace.address,
+          placeId: selectedPlace.placeId,
+        };
+        console.log('📍 Usando lugar seleccionado:', locationData);
+      } else {
+        // Si no hay lugar seleccionado, intentar geocodificar la dirección
+        try {
+          locationData = await googlePlacesService.getCoordinatesForRequest(formData.location);
+          console.log('📍 Datos de ubicación obtenidos:', locationData);
+        } catch (geocodeError) {
+          console.log('⚠️ Error en geocodificación, no se pueden obtener coordenadas...');
+          // Si falla la geocodificación, no usar coordenadas por defecto
+          locationData = {
+            coordinates: null, // No usar coordenadas por defecto
+            address: formData.location,
+            fallback: true,
+          };
+        }
+      }
+
+      // Mapear urgencia a texto en español para el título
+      const urgencyMap: { [key: string]: string } = {
+        'low': 'Baja',
+        'medium': 'Media', 
+        'high': 'Alta'
+      };
+
       const requestData = {
         clientId: user.id,
-        title: formData.title,
+        title: `Solicitud de ${formData.serviceType} - ${urgencyMap[formData.urgency] || formData.urgency}`, // Título generado automáticamente
         category: formData.serviceType,
         description: formData.description,
-        location: formData.location,
+        location: locationData.address, // Usar la dirección formateada
+        coordinates: locationData.coordinates, // Coordenadas reales
         images: formData.images,
-        urgency: 'medium', // Por defecto
+        urgency: formData.urgency, // Valor en inglés para el backend
         budget: 'No especificado', // Por defecto
         preferredDate: null, // Por defecto
         contactPhone: user.phone || null,
       };
 
       console.log('🔍 Enviando solicitud:', requestData);
+      console.log('🔍 FormData completo:', formData);
+      console.log('🔍 User data:', { id: user.id, phone: user.phone });
       
       // Enviar al backend real
       const response = await clientAPI.createRequest(requestData);
       
+      console.log('📥 Respuesta del backend:', response);
+      
       if (response.success) {
+        // Agregar la nueva solicitud al contexto para actualización automática
+        const newRequest = {
+          _id: response.data?.id || `temp_${Date.now()}`,
+          title: requestData.title,
+          category: requestData.category,
+          description: requestData.description,
+          location: requestData.location,
+          urgency: requestData.urgency,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          clientId: user.id
+        };
+        
+        console.log('📝 Nueva solicitud creada:', newRequest);
+        addNewRequest(newRequest);
+        
         Alert.alert(
           'Solicitud Creada',
           'Tu solicitud de servicio ha sido creada exitosamente. Los profesionales podrán verla y contactarte.',
@@ -121,20 +201,41 @@ export default function CreateRequestScreen() {
       
     } catch (error) {
       console.error('Error al crear la solicitud:', error);
-      Alert.alert('Error', 'No se pudo crear la solicitud. Inténtalo de nuevo.');
+      
+      // Mostrar el mensaje específico del error si está disponible
+      let errorMessage = 'No se pudo crear la solicitud. Inténtalo de nuevo.';
+      
+      if (error instanceof Error && error.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const serviceTypes = [
-    'Plomería',
-    'Electricidad',
-    'Limpieza',
-    'Pintura',
-    'Jardinería',
-    'Albañilería',
-    'Otros'
+  // Categorías iguales a las del home
+  const categories = [
+    { id: 'plomeria', name: 'Plomería', icon: 'water-outline', color: '#3b82f6' },
+    { id: 'gas', name: 'Gas', icon: 'flame-outline', color: '#f97316' },
+    { id: 'electricidad', name: 'Electricidad', icon: 'flash-outline', color: '#ef4444' },
+    { id: 'albanileria', name: 'Albañilería', icon: 'construct-outline', color: '#f59e0b' },
+    { id: 'carpinteria', name: 'Carpintería', icon: 'hammer-outline', color: '#8b4513' },
+    { id: 'herreria', name: 'Herrería', icon: 'hardware-chip-outline', color: '#64748b' },
+    { id: 'limpieza', name: 'Limpieza', icon: 'sparkles-outline', color: '#10b981' },
+    { id: 'mecanica', name: 'Mecánica', icon: 'car-outline', color: '#1e293b' },
+    { id: 'aire_acondicionado', name: 'Aire Acondicionado', icon: 'thermometer-outline', color: '#0ea5e9' },
+    { id: 'tecnico_comp_redes', name: 'Técnico en Comp y Redes', icon: 'laptop-outline', color: '#6366f1' },
+    { id: 'cerrajeria', name: 'Cerrajería', icon: 'key-outline', color: '#7c3aed' },
+  ];
+
+  const urgencyLevels = [
+    { value: 'low', label: 'Baja', description: 'Puede esperar unos días' },
+    { value: 'medium', label: 'Media', description: 'Necesita atención pronto' },
+    { value: 'high', label: 'Alta', description: 'Urgente - necesita atención inmediata' }
   ];
 
   return (
@@ -151,12 +252,34 @@ export default function CreateRequestScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Información Básica</Text>
             
-            <Input
-              label="Título de la solicitud"
-              placeholder="Ej: Necesito un plomero urgente"
-              value={formData.title}
-              onChangeText={(value) => updateFormData('title', value)}
-            />
+            <View style={styles.urgencySection}>
+              <Text style={styles.urgencyLabel}>Tiempo de ejecución</Text>
+              <View style={styles.urgencyOptions}>
+                {urgencyLevels.map((level) => (
+                  <TouchableOpacity
+                    key={level.value}
+                    style={[
+                      styles.urgencyCard,
+                      formData.urgency === level.value && styles.urgencyCardActive,
+                    ]}
+                    onPress={() => updateFormData('urgency', level.value)}
+                  >
+                    <Text style={[
+                      styles.urgencyLabelText,
+                      formData.urgency === level.value && styles.urgencyLabelTextActive,
+                    ]}>
+                      {level.label}
+                    </Text>
+                    <Text style={[
+                      styles.urgencyDescription,
+                      formData.urgency === level.value && styles.urgencyDescriptionActive,
+                    ]}>
+                      {level.description}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             <Input
               label="Descripción del problema"
@@ -169,36 +292,19 @@ export default function CreateRequestScreen() {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tipo de Servicio</Text>
-            <View style={styles.serviceTypesGrid}>
-              {serviceTypes.map((type) => (
-                <TouchableOpacity
-                  key={type}
-                  style={[
-                    styles.serviceTypeCard,
-                    formData.serviceType === type && styles.serviceTypeCardActive,
-                  ]}
-                  onPress={() => updateFormData('serviceType', type)}
-                >
-                  <Text style={[
-                    styles.serviceTypeText,
-                    formData.serviceType === type && styles.serviceTypeTextActive,
-                  ]}>
-                    {type}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ubicación</Text>
-            <Input
+            <AddressAutocompleteSimple
               label="Dirección del servicio"
-              placeholder="Ingresa la dirección donde se realizará el trabajo"
+              placeholder="Ingresa la dirección donde se realizará el trabajo (ej: Córdoba Capital, Av. Colón 1234, etc.)"
               value={formData.location}
               onChangeText={(value) => updateFormData('location', value)}
+              onPlaceSelected={handlePlaceSelected}
             />
+            
+            {/* Información sobre autocompletado */}
+            <Text style={styles.autocompleteInfo}>
+              💡 Escribe al menos 3 caracteres para ver sugerencias de direcciones
+            </Text>
           </View>
 
           <View style={styles.section}>
@@ -231,6 +337,49 @@ export default function CreateRequestScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Sección de Tipo de Servicio */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Tipo de Servicio</Text>
+            
+            {/* Mostrar tipo de servicio si viene automáticamente */}
+            {categoryId && formData.serviceType && (
+              <View style={[
+                styles.serviceTypeDisplayCard,
+                { backgroundColor: categories.find(cat => cat.name === formData.serviceType)?.color || theme.colors.primary }
+              ]}>
+                <Text style={styles.serviceTypeDisplayText}>{formData.serviceType}</Text>
+              </View>
+            )}
+            
+            {/* Mostrar selección de categorías solo si no viene desde una categoría específica */}
+            {!categoryId && (
+              <View style={styles.categoriesGrid}>
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category.id}
+                    style={[
+                      styles.categoryCard,
+                      formData.serviceType === category.name && styles.categoryCardActive,
+                    ]}
+                    onPress={() => updateFormData('serviceType', category.name)}
+                  >
+                    <Ionicons 
+                      name={category.icon as any} 
+                      size={24} 
+                      color={formData.serviceType === category.name ? theme.colors.white : category.color} 
+                    />
+                    <Text style={[
+                      styles.categoryText,
+                      formData.serviceType === category.name && styles.categoryTextActive,
+                    ]}>
+                      {category.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
           </View>
         </View>
@@ -400,6 +549,112 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     textAlign: 'center',
+  },
+  // Estilos para sección de urgencia
+  urgencySection: {
+    marginBottom: theme.spacing.lg,
+  },
+  urgencyLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+  },
+  urgencyOptions: {
+    gap: theme.spacing.sm,
+  },
+  urgencyCard: {
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.white,
+  },
+  urgencyCardActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  urgencyLabelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+  },
+  urgencyLabelTextActive: {
+    color: theme.colors.white,
+  },
+  urgencyDescription: {
+    fontSize: 14,
+    color: theme.colors.textSecondary,
+    lineHeight: 18,
+  },
+  urgencyDescriptionActive: {
+    color: theme.colors.white,
+    opacity: 0.9,
+  },
+  // Estilos para mostrar el tipo de servicio
+  serviceTypeDisplay: {
+    marginBottom: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.lg,
+  },
+  serviceTypeDisplayLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: theme.colors.text,
+    marginBottom: theme.spacing.sm,
+  },
+  serviceTypeDisplayCard: {
+    backgroundColor: theme.colors.primary,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    alignItems: 'center',
+  },
+  serviceTypeDisplayText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.white,
+  },
+  // Estilos para la selección de categorías
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  categoryCard: {
+    flex: 1,
+    minWidth: '45%',
+    maxWidth: '48%',
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 80,
+  },
+  categoryCardActive: {
+    backgroundColor: theme.colors.primary,
+    borderColor: theme.colors.primary,
+  },
+  categoryText: {
+    fontSize: 12,
+    color: theme.colors.text,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: theme.spacing.xs,
+  },
+  categoryTextActive: {
+    color: theme.colors.white,
+    fontWeight: '600',
+  },
+  // Estilos para información de autocompletado
+  autocompleteInfo: {
+    marginTop: theme.spacing.sm,
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
 

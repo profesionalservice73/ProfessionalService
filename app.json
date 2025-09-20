@@ -20,7 +20,7 @@
         "NSCameraUsageDescription": "Esta app necesita acceso a tu cámara para tomar fotos del problema."
       },
       "config": {
-        "googleMapsApiKey": "REEMPLAZA_CON_TU_API_KEY_DE_GOOGLE_MAPS"
+        "googleMapsApiKey": "AIzaSyCMC6Hjca0wTD8tm9fc9X30bthRaOmTUog"
       }
     },
     "android": {
@@ -35,21 +35,18 @@
         "ACCESS_COARSE_LOCATION",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "INTERNET"
+        "INTERNET",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "REEMPLAZA_CON_TU_API_KEY_DE_GOOGLE_MAPS"
+          "apiKey": "AIzaSyCMC6Hjca0wTD8tm9fc9X30bthRaOmTUog"
         }
       }
     },
     "web": {
       "favicon": "./assets/icon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "148ab5d8-e650-4a32-805b-0dde3cb30202"
-      }
     },
     "plugins": [
       [
@@ -57,7 +54,32 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Esta aplicación necesita acceso a tu ubicación para mostrar servicios cercanos y calcular distancias."
         }
-      ]
-    ]
+        ],
+        [
+          "expo-maps",
+          {
+            "requestLocationPermission": true,
+            "locationPermission": "Allow $(PRODUCT_NAME) to use your location",
+            "apiKey": {
+              "googleMaps": "AIzaSyCMC6Hjca0wTD8tm9fc9X30bthRaOmTUog"
+            }
+          }
+        ],
+        [
+          "expo-notifications",
+          {
+            "icon": "./assets/icon.png",
+            "color": "#ffffff",
+            "defaultChannel": "default"
+          }
+        ],
+        "expo-asset",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "41d57e39-a695-4835-8d13-70bfc7342b43"
+      }
+    }
   }
 }
