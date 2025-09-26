@@ -42,7 +42,55 @@ export const RequestCard: React.FC<RequestCardProps> = ({
       case 'low':
         return 'Baja';
       default:
-        return 'Normal';
+        return 'Media'; // Default a 'Media' en lugar de 'Normal'
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return theme.colors.warning;
+      case 'active_for_acceptance':
+        return theme.colors.info;
+      case 'accepted':
+        return theme.colors.primary;
+      case 'in_progress':
+        return theme.colors.primary;
+      case 'completed':
+        return theme.colors.success;
+      case 'completed_by_other':
+        return theme.colors.warning;
+      case 'awaiting_rating':
+        return theme.colors.primary;
+      case 'closed':
+        return theme.colors.success;
+      case 'cancelled':
+        return theme.colors.error;
+      default:
+        return theme.colors.textSecondary;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Pendiente';
+      case 'active_for_acceptance':
+        return 'Activa para Aceptar';
+      case 'in_progress':
+        return 'En Progreso';
+      case 'completed':
+        return 'Completada';
+      case 'completed_by_other':
+        return 'Completada por otro profesional';
+      case 'awaiting_rating':
+        return 'Esperando Calificación';
+      case 'closed':
+        return 'Cerrada';
+      case 'cancelled':
+        return 'Cancelada';
+      default:
+        return 'Pendiente';
     }
   };
 
@@ -81,9 +129,11 @@ export const RequestCard: React.FC<RequestCardProps> = ({
     );
   };
 
-  const isPending = request.status === 'pending';
-  const isAccepted = request.status === 'accepted' || request.status === 'in_progress';
-  const isCompleted = request.status === 'completed' || request.status === 'cancelled';
+  const isPending = (request.status === 'pending' || request.status === 'in_progress' || request.status === 'active_for_acceptance') && !request.isAccepted;
+  const isAccepted = request.isAccepted && request.acceptanceStatus === 'accepted';
+  const isCompleted = request.status === 'completed' || request.status === 'cancelled' || request.status === 'closed';
+  const isCompletedByMe = request.isCompletedByMe || request.status === 'completed';
+  const isCompletedByOther = request.isCompletedByOther || request.status === 'completed_by_other';
 
   const handleCancel = () => {
     if (!onCancel) return;
@@ -111,7 +161,12 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             <Text style={styles.urgencyText}>{getUrgencyText(request.urgency)}</Text>
           </View>
         </View>
-        <Text style={styles.category}>{request.category}</Text>
+        <View style={styles.statusContainer}>
+          <Text style={styles.category}>{request.category}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(request.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(request.status)}</Text>
+          </View>
+        </View>
       </View>
 
       {/* Descripción */}
@@ -158,6 +213,29 @@ export const RequestCard: React.FC<RequestCardProps> = ({
             <Ionicons name="close-circle" size={20} color={theme.colors.white} />
             <Text style={styles.acceptButtonText}>Cancelar</Text>
           </TouchableOpacity>
+        </View>
+      )}
+
+      {isCompletedByMe && (
+        <View style={styles.statusContainer}>
+          <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+          <Text style={styles.statusTextLarge}>Completada por ti</Text>
+        </View>
+      )}
+
+      {isCompletedByOther && (
+        <View style={styles.statusContainer}>
+          <Ionicons name="information-circle" size={20} color={theme.colors.warning} />
+          <Text style={styles.statusTextLarge}>Completada por otro profesional</Text>
+        </View>
+      )}
+
+      {request.otherProfessionalsCount > 0 && !isCompletedByOther && (
+        <View style={styles.otherProfessionalsContainer}>
+          <Ionicons name="people" size={16} color={theme.colors.primary} />
+          <Text style={styles.otherProfessionalsText}>
+            {request.otherProfessionalsCount} otro{request.otherProfessionalsCount > 1 ? 's' : ''} profesional{request.otherProfessionalsCount > 1 ? 'es' : ''} aceptó{request.otherProfessionalsCount > 1 ? 'ron' : ''}
+          </Text>
         </View>
       )}
     </TouchableOpacity>
@@ -209,6 +287,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.textSecondary,
     textTransform: 'capitalize',
+  },
+  statusBadge: {
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+    borderRadius: theme.borderRadius.sm,
+    marginLeft: theme.spacing.sm,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: theme.colors.white,
   },
   description: {
     fontSize: 14,
@@ -266,5 +355,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: theme.spacing.sm,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  statusTextLarge: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: theme.spacing.sm,
+    color: theme.colors.text,
+  },
+  otherProfessionalsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: theme.spacing.sm,
+    marginTop: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  otherProfessionalsText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: theme.spacing.xs,
+    color: theme.colors.primary,
   },
 });

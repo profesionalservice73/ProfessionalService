@@ -79,7 +79,7 @@ export default function RequestDetailScreen({ route, navigation }: any) {
       case "low":
         return "Baja";
       default:
-        return "Normal";
+        return "Media"; // Default a 'Media' en lugar de 'Normal'
     }
   };
 
@@ -87,12 +87,16 @@ export default function RequestDetailScreen({ route, navigation }: any) {
     switch (status) {
       case "pending":
         return theme.colors.warning;
+      case "active_for_acceptance":
+        return theme.colors.info;
       case "accepted":
         return theme.colors.primary;
       case "in_progress":
         return theme.colors.primary;
       case "completed":
         return theme.colors.success;
+      case "completed_by_other":
+        return theme.colors.warning;
       case "awaiting_rating":
         return theme.colors.primary;
       case "closed":
@@ -108,12 +112,14 @@ export default function RequestDetailScreen({ route, navigation }: any) {
     switch (status) {
       case "pending":
         return "Pendiente";
-      case "accepted":
-        return "Aceptada";
+      case "active_for_acceptance":
+        return "Activa para Aceptar";
       case "in_progress":
         return "En Progreso";
       case "completed":
         return "Completada";
+      case "completed_by_other":
+        return "Completada por otro profesional";
       case "awaiting_rating":
         return "Esperando Calificación";
       case "closed":
@@ -121,7 +127,7 @@ export default function RequestDetailScreen({ route, navigation }: any) {
       case "cancelled":
         return "Cancelada";
       default:
-        return "Desconocido";
+        return "Pendiente";
     }
   };
 
@@ -489,7 +495,7 @@ export default function RequestDetailScreen({ route, navigation }: any) {
         </View>
 
         {/* Acciones */}
-        {request.status === "pending" && (
+        {(request.status === "pending" || request.status === "active_for_acceptance") && (
           <View style={styles.section}>
             <TouchableOpacity
               style={styles.acceptButton}

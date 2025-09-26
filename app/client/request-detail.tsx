@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { AppleMaps, GoogleMaps } from "expo-maps";
+// import { AppleMaps, GoogleMaps } from "expo-maps";
 import { theme } from "../../config/theme";
 import { useNavigation } from "@react-navigation/native";
 
@@ -104,73 +104,16 @@ export default function RequestDetailScreen() {
   });
 
   const renderMap = () => {
-    if (mapError) {
-      return (
-        <View style={styles.mapFallback}>
-          <Ionicons name="map-outline" size={48} color={theme.colors.textSecondary} />
-          <Text style={styles.mapFallbackText}>Error al cargar el mapa</Text>
-          <Text style={styles.mapFallbackSubtext}>
-            {request.location?.address || 'Dirección no disponible'}
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={retryMap}>
-            <Text style={styles.retryButtonText}>Reintentar</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    const markers = [
-      {
-        id: 'request-location',
-        coordinates: {
-          latitude: request.location?.latitude || 0,
-          longitude: request.location?.longitude || 0,
-        },
-        title: 'Ubicación del servicio',
-        snippet: request.location?.address || 'Dirección no disponible',
-        showCallout: true,
-      }
-    ];
-
-    if (Platform.OS === 'ios') {
-      return (
-        <AppleMaps.View 
-          key={mapKey} 
-          style={styles.map}
-          markers={markers}
-          cameraPosition={{
-            coordinates: {
-              latitude: request.location?.latitude || 0,
-              longitude: request.location?.longitude || 0,
-            },
-            zoom: 15,
-          }}
-        />
-      );
-    } else if (Platform.OS === 'android') {
-      return (
-        <GoogleMaps.View 
-          key={mapKey} 
-          style={styles.map}
-          markers={markers}
-          cameraPosition={{
-            coordinates: {
-              latitude: request.location?.latitude || 0,
-              longitude: request.location?.longitude || 0,
-            },
-            zoom: 15,
-          }}
-        />
-      );
-    } else {
-      return (
-        <View style={styles.map}>
-          <Text style={styles.unsupportedText}>
-            Los mapas solo están disponibles en Android e iOS
-          </Text>
-        </View>
-      );
-    }
+    // MAPAS COMENTADOS PARA PRUEBAS LOCALES
+    return (
+      <View style={[styles.map, styles.mapFallback]}>
+        <Ionicons name="map-outline" size={48} color={theme.colors.textSecondary} />
+        <Text style={styles.mapFallbackText}>Mapa deshabilitado para pruebas locales</Text>
+        <Text style={styles.mapFallbackSubtext}>
+          {request.location?.address || 'Dirección no disponible'}
+        </Text>
+      </View>
+    );
   };
 
   return (
@@ -574,3 +517,82 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 });
+
+/* 
+CÓDIGO ORIGINAL DE MAPAS - DESCOMENTAR CUANDO SE NECESITE
+
+Para reactivar los mapas, descomenta la importación al inicio del archivo:
+import { AppleMaps, GoogleMaps } from "expo-maps";
+
+Y reemplaza la función renderMap() con este código:
+
+const renderMap = () => {
+  if (mapError) {
+    return (
+      <View style={styles.mapFallback}>
+        <Ionicons name="map-outline" size={48} color={theme.colors.textSecondary} />
+        <Text style={styles.mapFallbackText}>Error al cargar el mapa</Text>
+        <Text style={styles.mapFallbackSubtext}>
+          {request.location?.address || 'Dirección no disponible'}
+        </Text>
+        <TouchableOpacity style={styles.retryButton} onPress={retryMap}>
+          <Text style={styles.retryButtonText}>Reintentar</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const markers = [
+    {
+      id: 'request-location',
+      coordinates: {
+        latitude: request.location?.latitude || 0,
+        longitude: request.location?.longitude || 0,
+      },
+      title: 'Ubicación del servicio',
+      snippet: request.location?.address || 'Dirección no disponible',
+      showCallout: true,
+    }
+  ];
+
+  if (Platform.OS === 'ios') {
+    return (
+      <AppleMaps.View 
+        key={mapKey} 
+        style={styles.map}
+        markers={markers}
+        cameraPosition={{
+          coordinates: {
+            latitude: request.location?.latitude || 0,
+            longitude: request.location?.longitude || 0,
+          },
+          zoom: 15,
+        }}
+      />
+    );
+  } else if (Platform.OS === 'android') {
+    return (
+      <GoogleMaps.View 
+        key={mapKey} 
+        style={styles.map}
+        markers={markers}
+        cameraPosition={{
+          coordinates: {
+            latitude: request.location?.latitude || 0,
+            longitude: request.location?.longitude || 0,
+          },
+          zoom: 15,
+        }}
+      />
+    );
+  } else {
+    return (
+      <View style={styles.map}>
+        <Text style={styles.unsupportedText}>
+          Los mapas solo están disponibles en Android e iOS
+        </Text>
+      </View>
+    );
+  }
+};
+*/

@@ -40,12 +40,16 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'pending':
       return theme.colors.warning;
+    case 'active_for_acceptance':
+      return theme.colors.info;
     case 'accepted':
       return theme.colors.primary;
     case 'in_progress':
       return theme.colors.primary;
     case 'completed':
       return theme.colors.success;
+    case 'completed_by_other':
+      return theme.colors.warning;
     case 'awaiting_rating':
       return theme.colors.primary;
     case 'closed':
@@ -61,12 +65,14 @@ const getStatusText = (status: string) => {
   switch (status) {
     case 'pending':
       return 'Pendiente';
-    case 'accepted':
-      return 'Aceptada';
+    case 'active_for_acceptance':
+      return 'Activa para Aceptar';
     case 'in_progress':
       return 'En Progreso';
     case 'completed':
       return 'Completada';
+    case 'completed_by_other':
+      return 'Completada por otro profesional';
     case 'awaiting_rating':
       return 'Esperando Calificación';
     case 'closed':
@@ -74,7 +80,7 @@ const getStatusText = (status: string) => {
     case 'cancelled':
       return 'Cancelada';
     default:
-      return 'Desconocido';
+      return 'Pendiente';
   }
 };
 
@@ -100,7 +106,7 @@ const getUrgencyText = (urgency: string) => {
     case 'low':
       return 'Baja';
     default:
-      return 'Normal';
+      return 'Media'; // Default a 'Media' en lugar de 'Normal'
   }
 };
 
@@ -121,6 +127,9 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
   }, [activeFilter]);
 
   const loadRequests = async () => {
+    console.log('🔍 ProfessionalRequestsScreen - Professional object:', professional);
+    console.log('🔍 ProfessionalRequestsScreen - Professional ID:', professional?.id);
+    
     if (!professional?.id) {
       console.log('🔍 ProfessionalRequestsScreen - No professional ID available');
       setLoading(false);
@@ -139,7 +148,7 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
           response = await professionalAPI.getPendingRequests(professional.id);
           console.log('🔍 ProfessionalRequestsScreen - Pending requests response:', response);
           break;
-        case 'accepted':
+        case 'in_progress':
           response = await professionalAPI.getAcceptedRequests(professional.id);
           break;
         case 'cancelled':
@@ -174,9 +183,7 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
 
   const filteredRequests = activeFilter === 'all'
     ? requests
-    : activeFilter === 'accepted'
-      ? requests.filter(request => request.status === 'accepted' || request.status === 'in_progress')
-      : requests.filter(request => request.status === activeFilter);
+    : requests.filter(request => request.status === activeFilter);
 
   const handleRequestPress = (requestId: string) => {
     const request = requests.find(req => req._id === requestId || req.id === requestId);
@@ -203,7 +210,7 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
 
   const handleCompleteRequest = async (requestId: string) => {
     try {
-      const response = await professionalAPI.updateRequest(requestId, 'completed');
+      const response = await professionalAPI.updateRequest(requestId, 'completed', professional?.id);
       if (response.success) {
         Alert.alert('Éxito', 'Solicitud marcada como completada');
         loadRequests();
@@ -218,7 +225,7 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
 
   const handleCancelRequest = async (requestId: string) => {
     try {
-      const response = await professionalAPI.updateRequest(requestId, 'cancelled');
+      const response = await professionalAPI.updateRequest(requestId, 'cancelled', professional?.id);
       if (response.success) {
         Alert.alert('Solicitud cancelada', 'Has cancelado esta solicitud');
         loadRequests();
@@ -236,7 +243,8 @@ export default function ProfessionalRequestsScreen({ navigation }: any) {
   const filters = [
     { key: 'all', label: 'Todas' },
     { key: 'pending', label: 'Pendientes' },
-    { key: 'accepted', label: 'Aceptadas' },
+    { key: 'in_progress', label: 'En Progreso' },
+    { key: 'completed', label: 'Completadas' },
     { key: 'awaiting_rating', label: 'Esperando Calificación' },
     { key: 'closed', label: 'Cerradas' },
     { key: 'cancelled', label: 'Canceladas' },

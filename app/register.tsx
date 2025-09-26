@@ -29,6 +29,7 @@ import { professionalAPI, authAPI } from "../services/api";
 import { KYCFlow } from "../components/KYCFlow";
 import { CountryPhoneInput } from "../components/CountryPhoneInput";
 import { convertImagesToBase64 } from "../utils/imageUtils";
+import { AddressAutocompleteSimple } from "../components/AddressAutocompleteSimple";
 
 // Datos para el formulario de profesionales
 const categories = [
@@ -150,6 +151,9 @@ export default function RegisterScreen({ navigation }: any) {
   const [serviceText, setServiceText] = useState("");
   const [certificationText, setCertificationText] = useState("");
   const [languageText, setLanguageText] = useState("");
+  
+  // Estado para manejar ubicación con coordenadas
+  const [selectedPlace, setSelectedPlace] = useState<any>(null);
 
   // Estados para el formulario de profesional por pasos
   const [currentStep, setCurrentStep] = useState(1);
@@ -171,6 +175,12 @@ export default function RegisterScreen({ navigation }: any) {
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
     }
+  };
+
+  // Función para manejar la selección de lugar
+  const handlePlaceSelected = (placeDetails: any) => {
+    console.log('📍 Lugar seleccionado:', placeDetails);
+    setSelectedPlace(placeDetails);
   };
 
   // Funciones para campos dinámicos de profesionales
@@ -755,6 +765,7 @@ export default function RegisterScreen({ navigation }: any) {
           experience: professionalFormData.experience,
           description: professionalFormData.description,
           location: professionalFormData.location,
+          coordinates: selectedPlace?.coordinates || null,
           availability: professionalFormData.availability,
           responseTime: professionalFormData.responseTime,
           profileImage: (convertedImages as any).profileImage,
@@ -1400,13 +1411,23 @@ export default function RegisterScreen({ navigation }: any) {
         )}
       </View>
 
-      <Input
-        label="Ubicación de Trabajo"
-        placeholder="Ej: San José, Costa Rica"
-        value={professionalFormData.location}
-        onChangeText={(value) => updateProfessionalFormData("location", value)}
-        error={errors.location}
-      />
+      <View style={styles.inputContainer}>
+        <AddressAutocompleteSimple
+          label="Ubicación de Trabajo"
+          placeholder="Ingresa tu ubicación de trabajo (ej: Córdoba Capital, Av. Colón 1234, etc.)"
+          value={professionalFormData.location}
+          onChangeText={(value) => updateProfessionalFormData("location", value)}
+          onPlaceSelected={handlePlaceSelected}
+        />
+        {errors.location && (
+          <Text style={styles.errorText}>{errors.location}</Text>
+        )}
+        
+        {/* Información sobre autocompletado */}
+        <Text style={styles.autocompleteInfo}>
+          💡 Escribe al menos 3 caracteres para ver sugerencias de direcciones
+        </Text>
+      </View>
 
       <Input
         label="Horarios de Disponibilidad"
@@ -2918,5 +2939,13 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     lineHeight: 20,
     marginBottom: theme.spacing.sm,
+  },
+  // Estilos para información de autocompletado
+  autocompleteInfo: {
+    marginTop: theme.spacing.sm,
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

@@ -324,10 +324,7 @@ export default function EditProfileScreen({ navigation }: any) {
         };
         
         // Actualizar en el backend
-        const response = await professionalAPI.updateProfile({
-          professionalId: professional?.id,
-          ...updateData
-        });
+        const response = await professionalAPI.updateProfile(professional?.id, updateData);
 
         if (response.success) {
           // Actualizar el contexto local

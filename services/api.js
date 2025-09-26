@@ -1,6 +1,6 @@
 
 // Configuración de la API - IMPORTANTE: Cambiar por tu IP local
-const API_BASE_URL = "http://192.168.0.94:3000/api/v1" // "https://api-professional-service.vercel.app/api/v1" // 'https://apiprofessionalservice.onrender.com/api/v1';
+const API_BASE_URL = 'https://apiprofessionalservice.onrender.com/api/v1';
 // "http://192.168.0.94:3000/api/v1";
 
 
@@ -211,6 +211,27 @@ export const clientAPI = {
   getNotificationCount: async (clientId) => {
     return await apiRequest(`/client/notifications/count?clientId=${clientId}`);
   },
+
+  // Obtener profesionales que aceptaron una solicitud
+  getRequestProfessionals: async (requestId, clientId) => {
+    return await apiRequest(`/client/requests/${requestId}/professionals?clientId=${clientId}`);
+  },
+
+  // Seleccionar un profesional para una solicitud
+  selectProfessional: async (requestId, clientId, professionalId) => {
+    return await apiRequest(`/client/requests/${requestId}/select-professional`, {
+      method: "POST",
+      body: JSON.stringify({ clientId, professionalId }),
+    });
+  },
+
+  // Cerrar una solicitud sin seleccionar profesional
+  closeRequest: async (requestId, clientId, reason) => {
+    return await apiRequest(`/client/requests/${requestId}/close`, {
+      method: "POST",
+      body: JSON.stringify({ clientId, reason }),
+    });
+  },
 };
 
 // ===== PROFESIONAL =====
@@ -287,10 +308,10 @@ export const professionalAPI = {
   },
 
   // Actualizar solicitud del profesional
-  updateRequest: async (requestId, status) => {
+  updateRequest: async (requestId, status, professionalId) => {
     return await apiRequest(`/professional/requests/${requestId}`, {
       method: "PUT",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, professionalId }),
     });
   },
 
@@ -303,9 +324,13 @@ export const professionalAPI = {
 
   // Actualizar perfil del profesional
   updateProfile: async (professionalId, profileData) => {
+    // Asegurarse de que profileData no contenga professionalId
+    const cleanProfileData = { ...profileData };
+    delete cleanProfileData.professionalId;
+    
     return await apiRequest("/professional/profile", {
       method: "PUT",
-      body: JSON.stringify({ professionalId, ...profileData }),
+      body: JSON.stringify({ professionalId, ...cleanProfileData }),
     });
   },
 

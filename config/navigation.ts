@@ -18,6 +18,8 @@ export type RootStackParamList = {
   RequestDetail: { requestId: string; request: any };
   Reviews: { professionalId: string; professionalName: string; professionalImage?: string };
   AddReview: { professionalId: string; professionalName: string; onReviewAdded?: () => void };
+  RequestProfessionals: { requestId: string; professionals: any[]; requestData: any };
+  RateProfessional: { requestId: string; professional: any; requestData: any };
   SearchResults: { searchQuery: string; categoryId?: string };
 };
 

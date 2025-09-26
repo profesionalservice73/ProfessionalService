@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet, Dimensions, Platform, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-// import { AppleMaps, GoogleMaps } from "expo-maps"; // COMENTADO PARA USO LOCAL
+import { AppleMaps, GoogleMaps } from "expo-maps";
 import { theme } from "../config/theme";
 
 interface RealMapProps {
@@ -73,65 +73,48 @@ export const RealMap: React.FC<RealMapProps> = ({
     longitudeDelta: size === "full" ? 0.01 : 0.02,
   };
 
-  // COMENTADO PARA USO LOCAL - Reemplazado con placeholder
   const renderMap = () => {
-    // const markers = [
-    //   {
-    //     id: 'service-location',
-    //     coordinates: coordinates,
-    //     title: 'Ubicación del servicio',
-    //     snippet: locationText,
-    //     showCallout: true,
-    //   }
-    // ];
+    const markers = [
+      {
+        id: 'service-location',
+        coordinates: coordinates,
+        title: 'Ubicación del servicio',
+        snippet: locationText,
+        showCallout: true,
+      }
+    ];
 
-    // if (Platform.OS === 'ios') {
-    //   return (
-    //     <AppleMaps.View 
-    //       style={styles.map}
-    //       markers={markers}
-    //       cameraPosition={{
-    //         coordinates: coordinates,
-    //         zoom: size === "full" ? 15 : 12,
-    //       }}
-    //     />
-    //   );
-    // } else if (Platform.OS === 'android') {
-    //   return (
-    //     <GoogleMaps.View 
-    //       style={styles.map}
-    //       markers={markers}
-    //       cameraPosition={{
-    //         coordinates: coordinates,
-    //         zoom: size === "full" ? 15 : 12,
-    //       }}
-    //     />
-    //   );
-    // } else {
-    //   return (
-    //     <View style={styles.map}>
-    //       <Text style={styles.unsupportedText}>
-    //         Los mapas solo están disponibles en Android e iOS
-    //       </Text>
-    //     </View>
-    //   );
-    // }
-
-    // PLACEHOLDER PARA USO LOCAL
-    return (
-      <View style={styles.map}>
-        <View style={styles.mapPlaceholder}>
-          <Ionicons name="map-outline" size={48} color={theme.colors.primary} />
-          <Text style={styles.mapPlaceholderText}>Mapa (Modo Local)</Text>
-          <Text style={styles.mapPlaceholderSubtext}>
-            {locationText}
-          </Text>
-          <Text style={styles.mapPlaceholderNote}>
-            Coordenadas: {coordinates.latitude.toFixed(4)}, {coordinates.longitude.toFixed(4)}
+    if (Platform.OS === 'ios') {
+      return (
+        <AppleMaps.View 
+          style={styles.map}
+          markers={markers}
+          cameraPosition={{
+            coordinates: coordinates,
+            zoom: size === "full" ? 15 : 12,
+          }}
+        />
+      );
+    } else if (Platform.OS === 'android') {
+      return (
+        <GoogleMaps.View 
+          style={styles.map}
+          markers={markers}
+          cameraPosition={{
+            coordinates: coordinates,
+            zoom: size === "full" ? 15 : 12,
+          }}
+        />
+      );
+    } else {
+      return (
+        <View style={styles.map}>
+          <Text style={styles.unsupportedText}>
+            Los mapas solo están disponibles en Android e iOS
           </Text>
         </View>
-      </View>
-    );
+      );
+    }
   };
 
   return (

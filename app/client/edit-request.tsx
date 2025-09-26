@@ -217,8 +217,65 @@ export default function EditRequestScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleImagePicker = async () => {
+  const showImagePicker = () => {
+    Alert.alert(
+      'Seleccionar imagen',
+      '¿Cómo quieres agregar la imagen?',
+      [
+        {
+          text: 'Cámara',
+          onPress: () => takePhoto(),
+        },
+        {
+          text: 'Galería',
+          onPress: () => pickFromGallery(),
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const takePhoto = async () => {
     try {
+      // Solicitar permisos de cámara
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permisos requeridos', 'Necesitamos acceso a tu cámara para tomar fotos');
+        return;
+      }
+
+      // Abrir cámara
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImage = result.assets[0].uri;
+        setSelectedImage(newImage);
+        updateFormData('images', [...formData.images, newImage]);
+        console.log('📸 Foto tomada:', newImage);
+      }
+    } catch (error) {
+      console.error('Error tomando foto:', error);
+      Alert.alert('Error', 'No se pudo tomar la foto');
+    }
+  };
+
+  const pickFromGallery = async () => {
+    try {
+      // Solicitar permisos de galería
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permisos requeridos', 'Necesitamos acceso a tu galería para seleccionar fotos');
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -230,6 +287,7 @@ export default function EditRequestScreen() {
         const newImage = result.assets[0].uri;
         setSelectedImage(newImage);
         updateFormData('images', [...formData.images, newImage]);
+        console.log('🖼️ Imagen seleccionada:', newImage);
       }
     } catch (error) {
       console.error('Error seleccionando imagen:', error);
@@ -387,7 +445,7 @@ export default function EditRequestScreen() {
             {/* Fotos */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Fotos del Problema</Text>
-              <TouchableOpacity style={styles.addPhotoButton} onPress={handleImagePicker}>
+              <TouchableOpacity style={styles.addPhotoButton} onPress={showImagePicker}>
                 <Ionicons name="camera" size={24} color={theme.colors.primary} />
                 <Text style={styles.addPhotoText}>Agregar Foto</Text>
               </TouchableOpacity>

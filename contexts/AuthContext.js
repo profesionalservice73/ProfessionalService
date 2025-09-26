@@ -37,9 +37,9 @@ export const AuthProvider = ({ children }) => {
         const userData = JSON.parse(storedUser);
         console.log('🔍 AuthContext - Parsed user data:', userData);
         
-        // Crear timeout para validación de sesión
+        // Crear timeout para validación de sesión (aumentado a 20 segundos para producción)
         const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('Timeout: La validación de sesión tardó demasiado')), 8000); // 8 segundos
+          setTimeout(() => reject(new Error('Timeout: La validación de sesión tardó demasiado')), 20000); // 20 segundos
         });
         
         try {
@@ -65,8 +65,28 @@ export const AuthProvider = ({ children }) => {
           }
         } catch (sessionError) {
           console.error('❌ AuthContext - Error validando sesión:', sessionError);
-          // En caso de error de validación, asumir sesión inválida
-          await logout();
+          
+          // Si es timeout, intentar una vez más sin timeout
+          if (sessionError.message.includes('Timeout')) {
+            console.log('🔄 AuthContext - Timeout en validación, intentando sin timeout...');
+            try {
+              const retryValidation = await sessionService.validateSession(storedSessionId);
+              if (retryValidation.valid) {
+                setUser(userData);
+                setSessionId(storedSessionId);
+                console.log('✅ AuthContext - Usuario autenticado cargado en reintento:', userData);
+                return; // Salir exitosamente
+              }
+            } catch (retryError) {
+              console.error('❌ AuthContext - Error en reintento de validación:', retryError);
+            }
+          }
+          
+          // En caso de error de validación, usar datos locales como fallback
+          console.log('⚠️ AuthContext - Usando datos locales como fallback debido a error de validación');
+          setUser(userData);
+          setSessionId(storedSessionId);
+          console.log('✅ AuthContext - Usuario cargado con datos locales:', userData);
         }
       } else {
         console.log('🔍 AuthContext - No stored user or session found');
@@ -84,14 +104,8 @@ export const AuthProvider = ({ children }) => {
       console.log('🔍 AuthContext - Iniciando proceso de login...');
       setLoading(true);
       
-      // Crear timeout para login
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Timeout: El login tardó demasiado')), 15000); // 15 segundos
-      });
-      
-      // Hacer login con timeout
-      const loginPromise = authAPI.login(email, password);
-      const response = await Promise.race([loginPromise, timeoutPromise]);
+      // Hacer login sin timeout para permitir completar toda la carga de datos
+      const response = await authAPI.login(email, password);
       
       console.log('🔍 AuthContext - Login response:', response);
       

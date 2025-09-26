@@ -37,6 +37,8 @@ import ClientAboutScreen from './client/about';
 import ClientCustomerSupportScreen from './client/customer-support';
 import ReviewsScreen from './client/reviews';
 import AddReviewScreen from './client/add-review';
+import RequestProfessionalsScreen from './client/request-professionals';
+import RateProfessionalScreen from './client/rate-professional';
 import AdminDashboard from './admin/dashboard';
 
 // Tipos de navegación
@@ -197,6 +199,8 @@ const RootNavigator = () => {
             <Stack.Screen name="ClientSettings" component={ClientSettingsScreen} />
             <Stack.Screen name="ClientAbout" component={ClientAboutScreen} />
             <Stack.Screen name="ClientCustomerSupport" component={ClientCustomerSupportScreen} />
+            <Stack.Screen name="RequestProfessionals" component={RequestProfessionalsScreen} />
+            <Stack.Screen name="RateProfessional" component={RateProfessionalScreen} />
           </>
         )
       ) : (

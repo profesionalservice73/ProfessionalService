@@ -81,10 +81,14 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       const response = await professionalAPI.getProfileByUserId(user.id);
       console.log('🔍 ProfessionalContext - Response completa:', JSON.stringify(response, null, 2));
+      console.log('🔍 ProfessionalContext - Response.success:', response.success);
+      console.log('🔍 ProfessionalContext - Response.data:', response.data);
+      console.log('🔍 ProfessionalContext - Response.data.id:', response.data?.id);
       
       if (response.success && response.data) {
         console.log('🔍 ProfessionalContext - Response del backend:', response.data);
         console.log('🔍 ProfessionalContext - isRegistrationComplete del backend:', response.data.isRegistrationComplete);
+        console.log('🔍 ProfessionalContext - Professional ID del backend:', response.data.id);
         
         const professionalData: ProfessionalData = {
           id: response.data.id,
@@ -110,6 +114,8 @@ export const ProfessionalProvider: React.FC<{ children: React.ReactNode }> = ({ 
           totalReviews: response.data.totalReviews || 0,
           isRegistrationComplete: response.data.isRegistrationComplete ?? false,
         };
+        
+        console.log('🔍 ProfessionalContext - ProfessionalData creado con ID:', professionalData.id);
 
         console.log('🔍 ProfessionalContext - ProfessionalData creado:', professionalData);
         console.log('🔍 ProfessionalContext - isRegistrationComplete en ProfessionalData:', professionalData.isRegistrationComplete);

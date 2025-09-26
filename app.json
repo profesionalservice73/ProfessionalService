@@ -21,7 +21,8 @@
       },
       "config": {
         "googleMapsApiKey": "AIzaSyCMC6Hjca0wTD8tm9fc9X30bthRaOmTUog"
-      }
+      },
+      "bundleIdentifier": "com.professionalservice.app"
     },
     "android": {
       "package": "com.professionalservice.app",
@@ -54,26 +55,26 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Esta aplicación necesita acceso a tu ubicación para mostrar servicios cercanos y calcular distancias."
         }
-        ],
-        [
-          "expo-maps",
-          {
-            "requestLocationPermission": true,
-            "locationPermission": "Allow $(PRODUCT_NAME) to use your location",
-            "apiKey": {
-              "googleMaps": "AIzaSyCMC6Hjca0wTD8tm9fc9X30bthRaOmTUog"
-            }
+      ],
+      [
+        "expo-maps",
+        {
+          "requestLocationPermission": true,
+          "locationPermission": "Allow $(PRODUCT_NAME) to use your location",
+          "apiKey": {
+            "googleMaps": "AIzaSyCMC6Hjca0wTD8tm9fc9X30bthRaOmTUog"
           }
-        ],
-        [
-          "expo-notifications",
-          {
-            "icon": "./assets/icon.png",
-            "color": "#ffffff",
-            "defaultChannel": "default"
-          }
-        ],
-        "expo-asset",
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#ffffff",
+          "defaultChannel": "default"
+        }
+      ],
+      "expo-asset",
       "expo-font"
     ],
     "extra": {

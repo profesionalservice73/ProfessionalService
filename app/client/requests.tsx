@@ -21,11 +21,14 @@ import { useClientNotifications } from '../../hooks/useClientNotifications';
 import { formatDateForDisplay } from '../../utils/dateUtils';
 import { RatingModal } from '../../components/RatingModal';
 import { CancelRequestModal } from '../../components/CancelRequestModal';
+import { RequestProfessionalsModal } from '../../components/RequestProfessionalsModal';
 
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'pending':
       return theme.colors.warning;
+    case 'active_for_acceptance':
+      return theme.colors.info;
     case 'in_progress':
       return theme.colors.primary;
     case 'completed':
@@ -45,6 +48,8 @@ const getStatusText = (status: string) => {
   switch (status) {
     case 'pending':
       return 'Pendiente';
+    case 'active_for_acceptance':
+      return 'Esperando Aceptaciones';
     case 'in_progress':
       return 'En Progreso';
     case 'completed':
@@ -82,7 +87,8 @@ const RequestCard = ({
   onEdit, 
   onDelete,
   onRate,
-  onCancel
+  onCancel,
+  onViewProfessionals
 }: { 
   request: any; 
   onPress: (id: string) => void;
@@ -90,6 +96,7 @@ const RequestCard = ({
   onDelete: (id: string) => void;
   onRate: (request: any) => void;
   onCancel: (request: any) => void;
+  onViewProfessionals: (id: string) => void;
 }) => {
   return (
     <View style={styles.requestCard}>
@@ -160,9 +167,18 @@ const RequestCard = ({
           </>
         )}
         
+        {['active_for_acceptance', 'in_progress', 'completed', 'awaiting_rating'].includes(request.status) && (
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.professionalsButton]}
+            onPress={() => onViewProfessionals(request._id || request.id)}
+          >
+            <Ionicons name="people-outline" size={20} color={theme.colors.primary} />
+          </TouchableOpacity>
+        )}
+        
         {['in_progress', 'completed'].includes(request.status) && (
           <TouchableOpacity 
-            style={styles.actionButton} 
+            style={styles.actionButton}
             onPress={() => onCancel(request)}
           >
             <Ionicons name="close-outline" size={20} color={theme.colors.error} />
@@ -193,6 +209,8 @@ export default function RequestsScreen({ navigation }: any) {
   const [ratingModalVisible, setRatingModalVisible] = useState(false);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [professionalsModalVisible, setProfessionalsModalVisible] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string>('');
 
   // Recargar solicitudes cuando se regrese a esta pantalla
   useEffect(() => {
@@ -250,6 +268,52 @@ export default function RequestsScreen({ navigation }: any) {
     refreshRequests();
     setCancelModalVisible(false);
     setSelectedRequest(null);
+  };
+
+  const handleViewProfessionals = (requestId: string) => {
+    setSelectedRequestId(requestId);
+    setProfessionalsModalVisible(true);
+  };
+
+  const handleCloseProfessionalsModal = () => {
+    setProfessionalsModalVisible(false);
+    setSelectedRequestId('');
+  };
+
+  const handleSelectProfessional = async (professionalId: string) => {
+    try {
+      const response = await clientAPI.selectProfessional(selectedRequestId, user?.id || '', professionalId);
+      
+      if (response.success) {
+        Alert.alert('Éxito', 'Profesional seleccionado correctamente');
+        await refreshRequests();
+        setProfessionalsModalVisible(false);
+        setSelectedRequestId('');
+      } else {
+        Alert.alert('Error', response.error || 'Error al seleccionar el profesional');
+      }
+    } catch (error) {
+      console.error('Error selecting professional:', error);
+      Alert.alert('Error', 'Error de conexión al seleccionar el profesional');
+    }
+  };
+
+  const handleCloseRequest = async () => {
+    try {
+      const response = await clientAPI.closeRequest(selectedRequestId, user?.id || '', 'Cliente cerró la solicitud sin seleccionar profesional');
+      
+      if (response.success) {
+        Alert.alert('Éxito', 'Solicitud cerrada correctamente');
+        await refreshRequests();
+        setProfessionalsModalVisible(false);
+        setSelectedRequestId('');
+      } else {
+        Alert.alert('Error', response.error || 'Error al cerrar la solicitud');
+      }
+    } catch (error) {
+      console.error('Error closing request:', error);
+      Alert.alert('Error', 'Error de conexión al cerrar la solicitud');
+    }
   };
 
   const handleEditRequest = (requestId: string) => {
@@ -369,6 +433,7 @@ export default function RequestsScreen({ navigation }: any) {
               onDelete={handleDeleteRequest}
               onRate={handleRateRequest}
               onCancel={handleCancelRequest}
+              onViewProfessionals={handleViewProfessionals}
             />
           )}
           contentContainerStyle={styles.requestsList}
@@ -417,6 +482,15 @@ export default function RequestsScreen({ navigation }: any) {
         requestId={selectedRequest?._id || selectedRequest?.id || ''}
         clientId={user?.id || ''}
         serviceTitle={selectedRequest?.title || ''}
+      />
+
+      <RequestProfessionalsModal
+        visible={professionalsModalVisible}
+        onClose={handleCloseProfessionalsModal}
+        requestId={selectedRequestId}
+        clientId={user?.id || ''}
+        onSelectProfessional={handleSelectProfessional}
+        onCloseRequest={handleCloseRequest}
       />
     </SafeScreen>
   );
@@ -595,6 +669,10 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  professionalsButton: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
   },
   rateButton: {
     backgroundColor: theme.colors.primary,

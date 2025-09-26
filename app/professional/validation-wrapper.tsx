@@ -36,19 +36,6 @@ export default function ValidationWrapper() {
     }
 
     try {
-      console.log('🔍 ValidationWrapper - Saltando validación, yendo directamente al panel del profesional');
-      
-      // COMENTADO: Saltar toda la validación y ir directamente al panel del profesional
-      // Para desarrollo/testing, ir directamente al layout principal
-      console.log('🚀 [VALIDATION] Saltando validación, mostrando layout inmediatamente');
-      setValidationStatus('approved');
-      setLoading(false);
-      
-      // Cargar datos del profesional en segundo plano
-      loadProfessionalDataInBackground();
-      return;
-      
-      /* COMENTADO - VALIDACIÓN ORIGINAL
       console.log('🔍 ValidationWrapper - Verificando estado de validación para user:', user.id);
       
       // Crear un timeout para evitar carga infinita
@@ -91,32 +78,13 @@ export default function ValidationWrapper() {
         console.log('🔍 ValidationWrapper - No se encontró perfil profesional, asumiendo pending');
         setValidationStatus('pending');
       }
-      */
     } catch (error) {
       console.error('❌ ValidationWrapper - Error verificando estado de validación:', error);
-      // En caso de error, ir directamente al panel
-      console.log('🚀 [VALIDATION] Error en validación, yendo directamente al panel');
-      setValidationStatus('approved');
-      setLoading(false);
+      // En caso de error, asumir pending
+      setValidationStatus('pending');
     } finally {
       console.log('🔍 ValidationWrapper - Finalizando carga, estableciendo loading: false');
       setLoading(false);
-    }
-  };
-
-  // Función para cargar datos del profesional en segundo plano
-  const loadProfessionalDataInBackground = async () => {
-    try {
-      console.log('🔄 [BACKGROUND] Cargando datos del profesional en segundo plano...');
-      const response = await professionalAPI.getProfileByUserId(user.id);
-      
-      if (response.success && response.data) {
-        const professional = response.data;
-        setProfessionalData(professional);
-        console.log('✅ [BACKGROUND] Datos del profesional cargados en segundo plano');
-      }
-    } catch (error) {
-      console.error('❌ [BACKGROUND] Error cargando datos en segundo plano:', error);
     }
   };
 
@@ -124,11 +92,6 @@ export default function ValidationWrapper() {
     return <View style={styles.loadingContainer} />;
   }
 
-  // COMENTADO: Saltar validación y ir directamente al panel del profesional
-  console.log('🔍 ValidationWrapper - Saltando validación, mostrando layout principal del profesional');
-  return <ProfessionalLayout />;
-  
-  /* COMENTADO - LÓGICA ORIGINAL DE VALIDACIÓN
   // Mostrar pantalla según el estado de validación
   switch (validationStatus) {
     case 'pending':
@@ -159,7 +122,6 @@ export default function ValidationWrapper() {
     default:
       return <ProfessionalLayout />;
   }
-  */
 }
 
 const styles = StyleSheet.create({

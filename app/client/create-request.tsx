@@ -56,9 +56,99 @@ export default function CreateRequestScreen() {
     }));
   };
 
-  const pickImage = async () => {
+  const showImagePicker = () => {
+    Alert.alert(
+      'Seleccionar imagen',
+      '¿Cómo quieres agregar la imagen?',
+      [
+        {
+          text: 'Cámara',
+          onPress: () => takePhoto(),
+        },
+        {
+          text: 'Galería',
+          onPress: () => pickFromGallery(),
+        },
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
+  const takePhoto = async () => {
     try {
-      // Solicitar permisos de cámara y galería
+      console.log('📸 Iniciando toma de foto...');
+      
+      // Verificar si la cámara está disponible
+      const cameraAvailable = await ImagePicker.getCameraPermissionsAsync();
+      console.log('📸 Cámara disponible:', cameraAvailable);
+      
+      if (!cameraAvailable.canAskAgain && !cameraAvailable.granted) {
+        Alert.alert(
+          'Cámara no disponible', 
+          'La cámara no está disponible en este dispositivo o los permisos fueron denegados permanentemente.'
+        );
+        return;
+      }
+      
+      // Solicitar permisos de cámara
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      console.log('📸 Estado de permisos de cámara:', status);
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permisos requeridos', 
+          'Necesitamos acceso a tu cámara para tomar fotos. Por favor, habilita los permisos de cámara en la configuración de la app.'
+        );
+        return;
+      }
+
+      console.log('📸 Abriendo cámara...');
+      
+      // Configuración básica para la cámara
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.7,
+      });
+
+      console.log('📸 Resultado de la cámara:', result);
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImageUri = result.assets[0].uri;
+        console.log('📸 Foto tomada exitosamente:', selectedImageUri);
+        
+        setSelectedImage(selectedImageUri);
+        updateFormData('images', [selectedImageUri]);
+        
+        console.log('✅ Imagen guardada en formData');
+      } else {
+        console.log('📸 Usuario canceló la toma de foto');
+      }
+    } catch (error) {
+      console.error('❌ Error tomando foto:', error);
+      
+      // Mensaje más específico según el tipo de error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('camera')) {
+        Alert.alert(
+          'Cámara no disponible', 
+          'No se pudo acceder a la cámara. Esto puede suceder si estás usando un simulador o si la cámara no está disponible en tu dispositivo.'
+        );
+      } else {
+        Alert.alert(
+          'Error', 
+          'No se pudo abrir la cámara. Verifica que la cámara esté disponible y que tengas los permisos necesarios.'
+        );
+      }
+    }
+  };
+
+  const pickFromGallery = async () => {
+    try {
+      // Solicitar permisos de galería
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permisos requeridos', 'Necesitamos acceso a tu galería para seleccionar fotos');
@@ -78,7 +168,7 @@ export default function CreateRequestScreen() {
         const selectedImageUri = result.assets[0].uri;
         setSelectedImage(selectedImageUri);
         updateFormData('images', [selectedImageUri]);
-        console.log('🔍 Imagen seleccionada:', selectedImageUri);
+        console.log('🖼️ Imagen seleccionada:', selectedImageUri);
       }
     } catch (error) {
       console.error('Error seleccionando imagen:', error);
@@ -185,14 +275,22 @@ export default function CreateRequestScreen() {
         console.log('📝 Nueva solicitud creada:', newRequest);
         addNewRequest(newRequest);
         
+        // Obtener información de profesionales disponibles
+        const availableProfessionalsCount = response.data?.availableProfessionalsCount || 0;
+        const message = response.data?.message || 'Solicitud creada exitosamente';
+        
         Alert.alert(
-          'Solicitud Creada',
-          'Tu solicitud de servicio ha sido creada exitosamente. Los profesionales podrán verla y contactarte.',
+          'Solicitud Enviada',
+          message,
           [
             {
-              text: 'OK',
-              onPress: () => navigation.goBack(),
+              text: 'Ver Estado',
+              onPress: () => {
+                // Regresar a la pantalla anterior (probablemente la lista de solicitudes)
+                navigation.goBack();
+              },
             },
+            { text: 'OK', onPress: () => navigation.goBack() },
           ]
         );
       } else {
@@ -312,14 +410,18 @@ export default function CreateRequestScreen() {
             <Text style={styles.sectionSubtitle}>
               Agrega fotos para que los profesionales entiendan mejor el problema
             </Text>
-            
+
             {selectedImage ? (
               <View style={styles.imageContainer}>
                 <Image source={{ uri: selectedImage }} style={styles.selectedImage} />
                 <View style={styles.imageActions}>
-                  <TouchableOpacity style={styles.imageActionButton} onPress={pickImage}>
+                  <TouchableOpacity style={styles.imageActionButton} onPress={takePhoto}>
                     <Ionicons name="camera" size={20} color={theme.colors.primary} />
-                    <Text style={styles.imageActionText}>Cambiar</Text>
+                    <Text style={styles.imageActionText}>Sacar foto</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.imageActionButton} onPress={pickFromGallery}>
+                    <Ionicons name="images" size={20} color={theme.colors.primary} />
+                    <Text style={styles.imageActionText}>Galería</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.imageActionButton} onPress={removeImage}>
                     <Ionicons name="trash" size={20} color={theme.colors.error} />
@@ -328,15 +430,27 @@ export default function CreateRequestScreen() {
                 </View>
               </View>
             ) : (
-              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-                <View style={styles.imagePlaceholder}>
-                  <Ionicons name="camera" size={40} color={theme.colors.textSecondary} />
-                  <Text style={styles.imagePlaceholderText}>Agregar foto del problema</Text>
-                  <Text style={styles.imagePlaceholderSubtext}>
-                    Toca aquí para seleccionar una imagen
-                  </Text>
+              <View>
+                <View style={styles.imagePicker}>
+                  <View style={styles.imagePlaceholder}>
+                    <Ionicons name="camera" size={40} color={theme.colors.textSecondary} />
+                    <Text style={styles.imagePlaceholderText}>Agregar foto del problema</Text>
+                    <Text style={styles.imagePlaceholderSubtext}>
+                      Elige una opción para agregar una imagen
+                    </Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
+                <View style={styles.inlineActions}>
+                  <TouchableOpacity style={styles.inlineButton} onPress={takePhoto}>
+                    <Ionicons name="camera" size={20} color={theme.colors.white} />
+                    <Text style={styles.inlineButtonText}>Sacar foto</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.inlineButton, styles.inlineButtonSecondary]} onPress={pickFromGallery}>
+                    <Ionicons name="images" size={20} color={theme.colors.primary} />
+                    <Text style={[styles.inlineButtonText, styles.inlineButtonTextSecondary]}>Galería</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
           </View>
 
@@ -542,6 +656,34 @@ const styles = StyleSheet.create({
   imageActionText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  inlineActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: theme.spacing.md,
+    marginTop: theme.spacing.md,
+  },
+  inlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.md,
+  },
+  inlineButtonSecondary: {
+    backgroundColor: theme.colors.white,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+  },
+  inlineButtonText: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  inlineButtonTextSecondary: {
+    color: theme.colors.primary,
   },
   // Estilos para texto del placeholder
   imagePlaceholderSubtext: {

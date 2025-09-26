@@ -32,12 +32,16 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'pending':
       return theme.colors.warning;
+    case 'active_for_acceptance':
+      return theme.colors.info;
     case 'accepted':
       return theme.colors.primary;
     case 'in_progress':
       return theme.colors.primary;
     case 'completed':
       return theme.colors.success;
+    case 'completed_by_other':
+      return theme.colors.warning;
     case 'awaiting_rating':
       return theme.colors.primary;
     case 'closed':
@@ -53,12 +57,14 @@ const getStatusText = (status: string) => {
   switch (status) {
     case 'pending':
       return 'Pendiente';
-    case 'accepted':
-      return 'Aceptada';
+    case 'active_for_acceptance':
+      return 'Activa para Aceptar';
     case 'in_progress':
       return 'En Progreso';
     case 'completed':
       return 'Completada';
+    case 'completed_by_other':
+      return 'Completada por otro profesional';
     case 'awaiting_rating':
       return 'Esperando Calificación';
     case 'closed':
@@ -66,7 +72,7 @@ const getStatusText = (status: string) => {
     case 'cancelled':
       return 'Cancelada';
     default:
-      return 'Desconocido';
+      return 'Pendiente';
   }
 };
 
